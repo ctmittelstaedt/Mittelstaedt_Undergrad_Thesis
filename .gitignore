@@ -181,8 +181,8 @@ Rplots.pdf
 *.tif
 *.shp
 *.venv\
-.wav
-.txt
+*.wav
+*.txt
 ## temporary files
 *~
 # Word temporary
