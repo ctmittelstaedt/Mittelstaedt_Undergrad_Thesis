@@ -219,24 +219,10 @@ index.lock
 .txt
 
 # Ignore OpenSoundscape output
-opensoundscape.save/
-.mypy_cache/
-opensoundscape.egg-info/
-dist/
-__pycache__/
-doc/_build/
-*.ipynb_checkpoints/
-*.DS_Store
-docs/tutorials/woodcock_labeled_data
-docs/tutorials/annotated_data
-.vscode
-docs/tutorials/wandb
-untracked/
-docs/tutorials/rana_sierrae_2022
-lightning_logs/
-docs/tutorials/*.ckpt
-docs/tutorials/BirdNET*
-docs/tutorials/*.WAV
-docs/tutorials/*.csv
+.\Recognizers\All_annotations_copy
+.\Recognizers\new_env
+.\Recognizers\wandb
+
+
 
 
