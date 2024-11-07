@@ -219,10 +219,10 @@ index.lock
 .txt
 
 # Ignore OpenSoundscape output
-PythonGitHub/Mittelstaedt_Undergrad_Thesis/Recognizers/new_env
-PythonGitHub/Mittelstaedt_Undergrad_Thesis/Recognizers/wandb
-PythonGitHub/Mittelstaedt_Undergrad_Thesis/Recognizers/All_annotations_copy
-PythonGitHub/Mittelstaedt_Undergrad_Thesis/Recognizers/model_training_checkpoints
+Recognizers\new_env
+Recognizers\wandb
+Recognizers\All_annotations_copy
+Recognizers\model_training_checkpoints
 
 
 
