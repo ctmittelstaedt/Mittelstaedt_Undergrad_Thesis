@@ -219,9 +219,9 @@ index.lock
 .txt
 
 # Ignore OpenSoundscape output
-Recognizers\All_annotations_copy
-Recognizers\new_env
-Recognizers\wandb
+Recognizers/All_annotations_copy
+Recognizers/new_env
+Recognizers/wandb
 
 
 
