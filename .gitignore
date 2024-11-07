@@ -223,6 +223,10 @@ Recognizers\new_env
 Recognizers\wandb
 Recognizers\All_annotations_copy
 Recognizers\model_training_checkpoints
+Recognizers/new_env
+Recognizers/wandb
+Recognizers/All_annotations_copy
+Recognizers/model_training_checkpoints
 
 
 
