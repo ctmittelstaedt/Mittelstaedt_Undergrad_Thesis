@@ -183,6 +183,9 @@ Rplots.pdf
 *.venv\
 *.wav
 *.txt
+*.mp3
+*.m4a
+*.heic
 ## temporary files
 *~
 # Word temporary
@@ -209,5 +212,31 @@ index.lock
 # Ignore for both R and Python
 ## Ignore audio data files
 .wav
+.mp3
+.m4a
+.heic
 ## Ignore Raven annotation files
-.text
+.txt
+
+# Ignore OpenSoundscape output
+opensoundscape.save/
+.mypy_cache/
+opensoundscape.egg-info/
+dist/
+__pycache__/
+doc/_build/
+*.ipynb_checkpoints/
+*.DS_Store
+docs/tutorials/woodcock_labeled_data
+docs/tutorials/annotated_data
+.vscode
+docs/tutorials/wandb
+untracked/
+docs/tutorials/rana_sierrae_2022
+lightning_logs/
+docs/tutorials/*.ckpt
+docs/tutorials/BirdNET*
+docs/tutorials/*.WAV
+docs/tutorials/*.csv
+
+
