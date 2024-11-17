@@ -1,15 +1,15 @@
 
-import wandb
-try:
-   wandb.login()
-   wandb_session = wandb.init(
-       entity='ctmittelstaedt-university-of-british-columbia', 
-       project='Pika Recognizer',
-       name='Trial 2',
-    )
-except: #if wandb.init fails, don't use wandb logging
-    print('failed to create wandb session. wandb session will be None')
-    wandb_session = None
+#import wandb
+#try:
+   #wandb.login()
+   #wandb_session = wandb.init(
+       #entity='ctmittelstaedt-university-of-british-columbia', 
+       #project='Pika Recognizer',
+       #name='Trial 2',
+    #)
+#except: #if wandb.init fails, don't use wandb logging
+   # print('failed to create wandb session. wandb session will be None')
+   # wandb_session = None
 
 # the cnn module provides classes for training/predicting with various types of CNNs
 from opensoundscape import CNN
@@ -57,14 +57,15 @@ preprocessor.pipeline.to_spec.params
 print(preprocessor.pipeline.to_spec.params)
 
 # Set the current directory to where the dataset is downloaded
-dataset_path = Path("./All_annotations_copy/")
+#dataset_path = Path("./All_annotations_copy/")
 
 # Make a list of all of the selection table files
-raven_files = glob(f"{dataset_path}/raven_data/*/*.txt")
+raven_files = glob("./raven_data/*.txt")
+
 
 # Create a list of audio files, one corresponding to each Raven file 
 # (Audio files have the same names as selection files with a different extension)
-audio_files = glob(f"{dataset_path}/audio_data/*/*.wav")
+audio_files = glob("./audio_data/*.wav")
 
 
 from opensoundscape.annotations import BoxedAnnotations
@@ -80,9 +81,9 @@ annotations = BoxedAnnotations.from_raven_files(
 #annotations_data = annotations.df
 #annotations_data.to_csv("./Recognizers/All_annotations_copy/annotations_data.csv")
 
-# Parameters to use for label creation
+# Parameters to use for label creation*changed from 0.4 to 0.3
 clip_duration = 0.3
-clip_overlap = 0.16
+clip_overlap = 0.15
 min_label_overlap = 0.01
 species_of_interest = ["PIKA"] 
 
@@ -98,22 +99,21 @@ clip_labels = annotations.clip_labels(
 clip_labels.to_csv("./All_annotations_copy/clip_labels.csv")
 
 # Select all files from testing_data_raven as a test set
-mask = clip_labels.reset_index()['file'].apply(lambda x: 'testing_data_raven' in x).values
-test_set = clip_labels[mask]
+###mask = clip_labels.reset_index()['file'].apply(lambda x: 'testing_data_raven' in x).values
+###test_set = clip_labels[mask]
 
 # All other files will be used as a training set
-train_and_val_set = clip_labels.drop(test_set.index)
+train_and_val_set = clip_labels###.drop(test_set.index)
 
 # Save .csv tables of the training and validation sets to keep a record of them
 train_and_val_set.to_csv("./All_annotations_copy/train_and_val_set.csv")
-test_set.to_csv("./All_annotations_copy/test_set.csv")
+###test_set.to_csv("./All_annotations_copy/test_set.csv")
 
 train_and_val_set = pd.read_csv('./All_annotations_copy/train_and_val_set.csv',index_col=[0,1,2])
-test_set = pd.read_csv('./All_annotations_copy/test_set.csv',index_col=[0,1,2])
+###test_set = pd.read_csv('./All_annotations_copy/test_set.csv',index_col=[0,1,2])
 
 # Split our training data into training and validation sets
-train_df, valid_df = sklearn.model_selection.train_test_split(train_and_val_set, test_size=0.1, random_state=0)
-
+train_df, valid_df = sklearn.model_selection.train_test_split(train_and_val_set, test_size=0.2, random_state=0) # made test_size = 0.2 to split data into 20% validation, random_state ensures reproducibility
 train_df.to_csv("./All_annotations_copy/train_set.csv")
 valid_df.to_csv("./All_annotations_copy/valid_set.csv")
 
@@ -121,7 +121,31 @@ from opensoundscape.data_selection import resample
 
 
 # upsample (repeat samples) so that all classes have 80 samples
-balanced_train_df = resample(train_df,n_samples_per_class=80,random_state=0)
+#balanced_train_df = resample(train_df,n_samples_per_class=80,random_state=0)
+
+#*balancing the negatives and positives so there are 2x negatives as positives
+
+# Identify positives (rows where any column is TRUE)
+positives = train_df[train_df['PIKA'] > 0]
+
+# Identify negatives (rows where any column is FALSE)
+negatives = train_df[train_df['PIKA'] == 0]
+
+# Check how many positives and negatives there are
+num_positives = len(positives)
+num_negatives = len(negatives)
+
+# Now sample the negatives to achieve twice as many negatives as positives
+num_negatives_to_sample = min(2 * num_positives, num_negatives)
+
+# Sample exactly `num_negatives_to_sample` negatives without replacement
+negatives_downsampled = negatives.sample(num_negatives_to_sample, replace=False, random_state=0)
+
+# Concatenate positives and downsampled negatives into a balanced training set
+balanced_train_df = pd.concat([positives, negatives_downsampled])
+
+print(f"Number of positives: {num_positives}")
+print(f"Number of negatives: {num_negatives}")
 
 # Create a CNN object designed to recognize 3-second samples
 from opensoundscape import CNN
@@ -150,7 +174,7 @@ if __name__ == '__main__':
     model.train(
     balanced_train_df,
     valid_df,
-    epochs = 10,
+    epochs = 2,
     batch_size = 20,
     log_interval = 100, #log progress every 100 batches
     num_workers = 6, #4 parallelized cpu tasks for preprocessing
@@ -158,4 +182,5 @@ if __name__ == '__main__':
     save_interval = 10, #save checkpoint every 10 epochs
     save_path = checkpoint_folder #location to save checkpoints
 )
+
 
