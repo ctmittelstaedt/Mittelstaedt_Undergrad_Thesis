@@ -22,16 +22,19 @@ from opensoundscape import Audio, Spectrogram
 from pathlib import Path
 
 # Load audio file
-audio_object = Audio.from_file("C:\\Users\\User\\Desktop\\All_annotations_all_pika\\MD_training data\\PIKARU14\\PIKARU14_20240731_162002.wav")
+audio_object = Audio.from_file("C:\\Users\\User\\Desktop\\All_annotations_all_pika\\PP_training_data\\PIKARU6\\PIKARU6_20240719_120002.wav")
 audio_object
 
 # Trim audio to centre pika call in the spectrogram frame and apply bandpass filter
-trimmed = audio_object.trim(279.6,280).bandpass(700,15000,order=10)
+trimmed = audio_object.trim(168.36,168.72)#.bandpass(0,15000,order=1)
 
 # Create a spectrogram object
 spectrogram_object = Spectrogram.from_audio(trimmed,
                                             overlap_fraction=0.9,
                                             )
+
+# Remove higher frequencies
+spectrogram_object = spectrogram_object.bandpass(700,15000)
 
 # Plot the spectrogram
 spectrogram_object.plot()
