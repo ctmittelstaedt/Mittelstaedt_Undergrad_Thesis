@@ -19,20 +19,13 @@ plt.rcParams['figure.figsize']=[15,5] #for large visuals
 model = load_model('model_training_checkpoints/best.model')
 
 #load audio files
-audio_files = glob("./audio_data/*/*.mp3")
+#audio_files = glob("./audio_data/*/*.mp3")
 
 #load the table listing files in the test set 
 test_set = pd.read_csv('./All_annotations_copy/test_set.csv',index_col=[0,1,2])
 
 from opensoundscape import Audio
 
-# Check the length of each audio file before processing
-for file in audio_files:
-    audio = Audio.from_file(file)
-    print(f"File: {file}, Length: {audio.duration}s")
-    if audio.duration < 0.3:
-        print(f"Warning: {file} is shorter than 0.3s")
-        
 # subset the labels to only those the model was trained on
 test_set = test_set[model.classes]
 
