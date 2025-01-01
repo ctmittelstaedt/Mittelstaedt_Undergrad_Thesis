@@ -1,15 +1,15 @@
 
-import wandb
-try:
-   wandb.login()
-   wandb_session = wandb.init(
-       entity='ctmittelstaedt-university-of-british-columbia', 
-       project='Pika Recognizer',
-       name='Trial 2',
-    )
-except: #if wandb.init fails, don't use wandb logging
-    print('failed to create wandb session. wandb session will be None')
-    wandb_session = None
+#import wandb
+#try:
+   #wandb.login()
+   #wandb_session = wandb.init(
+       #entity='ctmittelstaedt-university-of-british-columbia', 
+       #project='Pika Recognizer',
+       #name='Trial 2',
+    #)
+#except: #if wandb.init fails, don't use wandb logging
+    #print('failed to create wandb session. wandb session will be None')
+    #wandb_session = None
 
 # the cnn module provides classes for training/predicting with various types of CNNs
 from opensoundscape import CNN
@@ -60,12 +60,12 @@ print(preprocessor.pipeline.to_spec.params)
 #dataset_path = Path("./All_annotations_copy/")
 
 # Make a list of all of the selection table files
-raven_files = glob("./raven_data/*/*.txt")
+raven_files = glob("./raven_data/*/*/*.txt")
 
 
 # Create a list of audio files, one corresponding to each Raven file 
 # (Audio files have the same names as selection files with a different extension)
-audio_files = glob("./audio_data/*/*.wav") + glob("./audio_data/*/*.mp3")
+audio_files = glob("./audio_data/*/*/*.wav") + glob("./audio_data/*/*/*.mp3")
 
 
 from opensoundscape.annotations import BoxedAnnotations
@@ -84,7 +84,7 @@ annotations = BoxedAnnotations.from_raven_files(
 # Parameters to use for label creation*changed from 0.4 to 0.3
 clip_duration = 0.3
 clip_overlap = 0.15
-min_label_overlap = 0.01
+min_label_overlap = 0.07
 species_of_interest = ["PIKA"] 
 
 # Create dataframe of one-hot labels
@@ -182,8 +182,8 @@ if __name__ == '__main__':
     model.train(
     train_df,
     valid_df,
-    epochs = 2,
-    batch_size = 20,
+    epochs = 70,
+    batch_size = 64,
     log_interval = 100, #log progress every 100 batches
     num_workers = 6, #4 parallelized cpu tasks for preprocessing
     wandb_session=None, #wandb_session,
