@@ -11,6 +11,7 @@ import pandas as pd
 from glob import glob
 import subprocess
 
+
 #set up plotting
 from matplotlib import pyplot as plt
 plt.rcParams['figure.figsize']=[15,5] #for large visuals
@@ -25,7 +26,6 @@ model = load_model('model_training_checkpoints/best.model')
 # Make a list of all of the selection table files
 raven_files = glob("./raven_data/*/*.txt")
 
-
 # Create a list of audio files, one corresponding to each Raven file (Audio files have the same names as selection files with a different extension)
 audio_files = glob("./audio_data/*/*.wav") + glob("./audio_data/*/*.mp3")
 
@@ -36,7 +36,6 @@ annotations = BoxedAnnotations.from_raven_files(
     "Annotation",
     audio_files, 
     keep_extra_columns=['Selection','View', 'Channel','Begin Time (s)', 'End Time (s)', 'Low Freq (Hz)', 'High Freq (Hz)','Annotation'])
-
 
 # Access the underlying DataFrame
 annotations_data = annotations.df
@@ -72,7 +71,8 @@ test_set.to_csv("./All_annotations_copy/test_set.csv")
 #load the table listing files in the test set 
 test_set = pd.read_csv('./All_annotations_copy/test_set.csv',index_col=[0,1,2])
 
-#################
+#############################################
+
 
 #*balancing the negatives and positives so there are 2x negatives as positives
 from opensoundscape.data_selection import resample
@@ -94,38 +94,93 @@ negatives_downsampled = negatives.sample(num_negatives_to_sample, replace=False,
 
 # Concatenate positives and downsampled negatives into a balanced training set
 test_set = pd.concat([positives, negatives_downsampled])
-#############################################
+
+
+#################################
 
 from opensoundscape import Audio
 
 # subset the labels to only those the model was trained on
 test_set = test_set[model.classes]
 
-print(test_set.shape)
-print(test_set.head())
-
 # run "inference": use the CNN to predict the presence of each class in the audio clips
-predictions = model.predict(test_set,num_workers=0,batch_size=4)
+predictions = model.predict(test_set,
+                            num_workers=0,
+                            batch_size=1000
+)
 
-# save predictions if desired
+# save predictions
 predictions.to_csv('./All_annotations_copy/cnn_predictions_test_set.csv')
 
 predictions = pd.read_csv('./All_annotations_copy/cnn_predictions_test_set.csv',index_col=[0,1,2])
 
+
+print(predictions.head())
+
+
+# Binarize
+def binarize(x, threshold):
+    """Return a list of 0, 1 by thresholding vector x"""
+    if len(np.shape(x)) > 2:
+        raise ValueError("Shape must be 1-dimensional or 2-dimensional")
+
+    # Check if the array is 2D (which it is in this case)
+    if len(np.shape(x)) == 2:
+        # Access the values correctly using .iloc for DataFrame
+        return [1 if x.iloc[i, 0] > threshold else 0 for i in range(len(x))]
+
+    # If it's a 1D array, process each element
+    return [1 if xi > threshold else 0 for xi in x]
+
+
+binary_predictions = pd.Series(binarize(predictions['PIKA'], threshold=4.7), index=predictions.index)
+
+predictions['Binary_Predictions'] = binary_predictions
+
+predictions.to_csv('./All_annotations_copy/cnn_predictions_test_set_binarized.csv')
+
+predictions = pd.read_csv('./All_annotations_copy/cnn_predictions_test_set_binarized.csv',index_col=[0,1,2])
+
+print(predictions.columns)
+print(predictions.head())
+print(model.classes)
+
 import matplotlib.pyplot as plt
 import numpy as np
-fig, axs = plt.subplots(1,1, figsize = (10,40))
+
+# Histogram for binary predictions
+fig, axs = plt.subplots(1,1, figsize = (20,40))
 axs = np.ravel(axs)
 for ax, species in enumerate(model.classes):
     positives = test_set[species] == 1
     negatives = test_set[species] == 0
-    axs[ax].hist(predictions.loc[positives][species], alpha=0.5, color="red", label="Positives")
-    axs[ax].hist(predictions.loc[negatives][species], alpha=0.5, color="blue", label="Negatives")
+    positive_predictions = binary_predictions.loc[positives.index]
+    negative_predictions = binary_predictions.loc[negatives.index]
+    axs[ax].hist(positive_predictions, alpha=0.5, color="red", label="Positives")
+    axs[ax].hist(negative_predictions, alpha=0.5, color="blue", label="Negatives")
     axs[ax].set_yscale("log")
     axs[ax].title.set_text(species)
     axs[ax].set_ylabel("Number of audio segments")
     axs[ax].set_xlabel("Score")
     axs[ax].legend()
 
-    plt.tight_layout()
-    plt.show()
+
+plt.tight_layout(pad=9.0)
+plt.show()
+
+# Histogram for predictions
+fig, axs = plt.subplots(1,1, figsize = (20,40))
+axs = np.ravel(axs)
+for ax, species in enumerate(model.classes):
+    positives = test_set[species] == 1
+    negatives = test_set[species] == 0
+    axs[ax].hist(predictions[positives][species], alpha=0.5, color="red", label="Positives")
+    axs[ax].hist(predictions[negatives][species], alpha=0.5, color="blue", label="Negatives")
+    axs[ax].set_yscale("log")
+    axs[ax].title.set_text(species)
+    axs[ax].set_ylabel("Number of audio segments")
+    axs[ax].set_xlabel("Score")
+    axs[ax].legend()
+
+plt.tight_layout(pad=9.0)
+plt.show()
