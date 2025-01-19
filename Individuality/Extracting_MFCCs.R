@@ -8,6 +8,8 @@ install.packages("e1071")
 install.packages("stringr")
 install.packages("ggplot2")
 install.packages("viridis")
+install.packages("apcluster")
+install.packages("tidyverse")
 
 ##### Load required libraries
 library(tuneR)
@@ -17,6 +19,8 @@ library(e1071)
 library(stringr)
 library(ggplot2)
 library(viridis)
+library(apcluster)
+library(tidyverse)
 
 ##### Save all .wav files and set working directory to access the files
 setwd("C:\\Users\\User\\Desktop\\Pika_Data_Analysis_copy_Oct2024\\Individuality")
@@ -46,7 +50,7 @@ for (j in 1:length(filehandles)) {
     
     # Find duration of .wav file and divide into 5 windows
     wav.dur <- duration(w)
-    win.time <- wav.dur / 5
+    win.time <- wav.dur / 9
     
     # Calculate MFCCs
     melfcc.output <- melfcc(
@@ -64,7 +68,7 @@ for (j in 1:length(filehandles)) {
     # Ensure only 4 time windows are used for MFCC and delta coefficients
     # Also append .wav duration
     mfcc.vector <-
-      c(as.vector(t(melfcc.output[1:4, 2:12])), as.vector(t(deltas.output[1:4, 2:12])), wav.dur)
+      c(as.vector(t(melfcc.output[1:8, 2:12])), as.vector(t(deltas.output[1:4, 2:12])), wav.dur)
     
     # Add to list
     mfcc.vector.list[[j]] <- mfcc.vector
@@ -111,5 +115,44 @@ mfcc.data.frame <- as.data.frame(mfcc.data.frame)
 
 ####Check data structure
 str(mfcc.data.frame)
+
+#remove non-MFCC columns
+x <- mfcc.data.frame |> select(-c(loc, filehandles, id, dur))
+x
+x2 <- x |> select(31:35)
+x2
+
+
+## run affinity propagation
+apres <- apcluster(negDistMat(r=2), x2, q=0.7, details=TRUE)
+
+## plot information about clustering run
+plot(apres)
+
+## plot clustering result*
+plot(apres, x2)
+
+## perform agglomerative clustering of affinity propagation clusters
+aggres1 <- aggExCluster(x=apres)
+
+## show dendrograms
+plot(aggres1)
+plot(aggres1, showSamples=TRUE)
+
+## show clustering result for 4 clusters*
+plot(aggres1, x2, k=4)
+
+## perform agglomerative clustering of whole data set
+aggres2 <- aggExCluster(negDistMat(r=2), x2)
+
+## show dendrogram
+plot(aggres2)
+
+## show heatmap along with dendrogram
+heatmap(aggres2)
+
+## show clustering result for 2 clusters*
+plot(aggres2, x2, k=2)
+
 
 
