@@ -17,12 +17,10 @@ from matplotlib import pyplot as plt
 plt.rcParams['figure.figsize']=[15,5] #for large visuals
 
 #load model
-model = load_model('model_training_checkpoints/best.model')
+#model = load_model("./model_training_checkpoints/best.model")
+#model = load_model("C:/Users/User/Desktop/best.model")
 
-#load audio files
-#audio_files = glob("./audio_data/*/*.mp3")
-
-##################
+##################From recognizer code to create test set so that I can play around with it.
 # Make a list of all of the selection table files
 raven_files = glob("./raven_data/*/*.txt")
 
@@ -73,49 +71,52 @@ test_set = pd.read_csv('./All_annotations_copy/test_set.csv',index_col=[0,1,2])
 
 #############################################
 
-
 #*balancing the negatives and positives so there are 2x negatives as positives
 from opensoundscape.data_selection import resample
+from sklearn.utils import shuffle
+
 # Identify positives (rows where any column is TRUE)
-positives = test_set[test_set['PIKA'] > 0]
+#positives = test_set[test_set['PIKA'] > 0]
 
 # Identify negatives (rows where any column is FALSE)
-negatives = test_set[test_set['PIKA'] == 0]
+#negatives = test_set[test_set['PIKA'] == 0]
 
 # Check how many positives and negatives there are
-num_positives = len(positives)
-num_negatives = len(negatives)
+#num_positives = len(positives)
+#num_negatives = len(negatives)
 
 # Now sample the negatives to achieve twice as many negatives as positives
-num_negatives_to_sample = min(2 * num_positives, num_negatives)
+#num_negatives_to_sample = min(2 * num_positives, num_negatives)
 
 # Sample exactly `num_negatives_to_sample` negatives without replacement
-negatives_downsampled = negatives.sample(num_negatives_to_sample, replace=False, random_state=0)
+#negatives_downsampled = negatives.sample(num_negatives_to_sample, replace=False, random_state=0) #random_state for reproducibility
 
 # Concatenate positives and downsampled negatives into a balanced training set
-test_set = pd.concat([positives, negatives_downsampled])
+#test_set = pd.concat([positives, negatives_downsampled])
 
+# Add shuffling to randomize
+#test_set = shuffle(test_set, random_state=0) #random_state for reproducibility
 
 #################################
 
 from opensoundscape import Audio
 
 # subset the labels to only those the model was trained on
-test_set = test_set[model.classes]
+#test_set = test_set[model.classes]
 
 # run "inference": use the CNN to predict the presence of each class in the audio clips
-predictions = model.predict(test_set,
-                            num_workers=0,
-                            batch_size=1000
-)
+#predictions = model.predict(test_set,
+                            #num_workers=0,
+                            #batch_size=1000
+#)
 
 # save predictions
-predictions.to_csv('./All_annotations_copy/cnn_predictions_test_set.csv')
+#predictions.to_csv('./All_annotations_copy/cnn_predictions_test_set.csv')
 
 predictions = pd.read_csv('./All_annotations_copy/cnn_predictions_test_set.csv',index_col=[0,1,2])
 
 
-print(predictions.head())
+#print(predictions.head())
 
 
 # Binarize
@@ -126,14 +127,14 @@ def binarize(x, threshold):
 
     # Check if the array is 2D (which it is in this case)
     if len(np.shape(x)) == 2:
-        # Access the values correctly using .iloc for DataFrame
+        #Access the values correctly using .iloc for DataFrame
         return [1 if x.iloc[i, 0] > threshold else 0 for i in range(len(x))]
 
     # If it's a 1D array, process each element
     return [1 if xi > threshold else 0 for xi in x]
 
 
-binary_predictions = pd.Series(binarize(predictions['PIKA'], threshold=4.7), index=predictions.index)
+binary_predictions = pd.Series(binarize(predictions['PIKA'], threshold=6.5), index=predictions.index)
 
 predictions['Binary_Predictions'] = binary_predictions
 
@@ -141,12 +142,54 @@ predictions.to_csv('./All_annotations_copy/cnn_predictions_test_set_binarized.cs
 
 predictions = pd.read_csv('./All_annotations_copy/cnn_predictions_test_set_binarized.csv',index_col=[0,1,2])
 
-print(predictions.columns)
+
+######
+print("Test Set (First 5 rows):")
+print(test_set.head())
+
+print("\nPredictions (First 5 rows):")
 print(predictions.head())
-print(model.classes)
+
+# Check the unique values of the index columns in both DataFrames
+print("\nUnique values in test_set index:")
+print(test_set.index.unique())
+
+print("\nUnique values in predictions index:")
+print(predictions.index.unique())
+
+
+# Step 2: Merge the DataFrames on the index
+merged_df = pd.merge(test_set, predictions, left_index=True, right_index=True, how='inner', suffixes=('_file1', '_file2'))
+
+# Step 3: Rename the PIKA columns to more descriptive names
+merged_df.rename(columns={'PIKA_file1': 'pika_present', 'PIKA_file2': 'predict_score'}, inplace=True)
+
+# Step 4: Optionally, rename the 'Binary_Predictions' column from predictions to something more descriptive
+merged_df.rename(columns={'Binary_Predictions': 'binary_predictions'}, inplace=True)
+
+merged_df.to_csv('./All_annotations_copy/predictions_fully_merged.csv')
+
+#######################
+# Generating evaluation metrics
+from sklearn import metrics
+
+# Define 'actual' as the 'pika_present' column, converting TRUE/FALSE to 1/0
+# Assuming TRUE is represented as `True` and FALSE as `False` in the 'pika_present' column
+df = pd.read_csv('./All_annotations_copy/predictions_fully_merged.csv')
+
+actual = df['pika_present'].astype(int)
+
+# Define 'predicted' as the 'predict_score' column
+predicted = df['binary_predictions']
+
+confusion_matrix = metrics.confusion_matrix(actual, predicted)
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = ['absent', 'present'])
+cm_display.plot()
+plt.show()
 
 # Histogram for binary predictions
 fig, axs = plt.subplots(1,1, figsize = (20,40))
@@ -165,11 +208,11 @@ for ax, species in enumerate(model.classes):
     axs[ax].legend()
 
 
-plt.tight_layout(pad=9.0)
+plt.tight_layout(pad=15.0)
 plt.show()
 
 # Histogram for predictions
-fig, axs = plt.subplots(1,1, figsize = (20,40))
+fig, axs = plt.subplots(1,1, figsize = (10,20))
 axs = np.ravel(axs)
 for ax, species in enumerate(model.classes):
     positives = test_set[species] == 1
