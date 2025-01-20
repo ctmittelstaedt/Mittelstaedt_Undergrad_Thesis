@@ -236,3 +236,9 @@ Recognizers/opensoundscape_notebook_tutorials/__MACOSX/demos-for-opso/resources/
 Recognizers/evaluating_test_set_histograms/good_pika_test.png
 Recognizers/evaluating_test_set_histograms/pika_test_Dec2024.png
 Recognizers/evaluating_test_set_histograms/test_Jan1.png
+*.xml
+*.prj
+*.shx
+*.dbf
+SDM/iNaturalist/observations-517827.csv
+SDM/Yukon_gov/YCDC_Pika_visit_data.xlsx
