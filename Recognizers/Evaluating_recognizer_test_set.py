@@ -133,30 +133,14 @@ def binarize(x, threshold):
     # If it's a 1D array, process each element
     return [1 if xi > threshold else 0 for xi in x]
 
-
-binary_predictions = pd.Series(binarize(predictions['PIKA'], threshold=6.5), index=predictions.index)
+#try this for binary: opensoundscape.metrics.predict_multi_target_labels(scores, threshold)
+binary_predictions = pd.Series(binarize(predictions['PIKA'], threshold=5), index=predictions.index)
 
 predictions['Binary_Predictions'] = binary_predictions
 
 predictions.to_csv('./All_annotations_copy/cnn_predictions_test_set_binarized.csv')
 
 predictions = pd.read_csv('./All_annotations_copy/cnn_predictions_test_set_binarized.csv',index_col=[0,1,2])
-
-
-######
-print("Test Set (First 5 rows):")
-print(test_set.head())
-
-print("\nPredictions (First 5 rows):")
-print(predictions.head())
-
-# Check the unique values of the index columns in both DataFrames
-print("\nUnique values in test_set index:")
-print(test_set.index.unique())
-
-print("\nUnique values in predictions index:")
-print(predictions.index.unique())
-
 
 # Step 2: Merge the DataFrames on the index
 merged_df = pd.merge(test_set, predictions, left_index=True, right_index=True, how='inner', suffixes=('_file1', '_file2'))
@@ -179,8 +163,11 @@ df = pd.read_csv('./All_annotations_copy/predictions_fully_merged.csv')
 
 actual = df['pika_present'].astype(int)
 
-# Define 'predicted' as the 'predict_score' column
+# Define 'predicted' as the 'binary_score' column
 predicted = df['binary_predictions']
+
+# Define 'score' as the 'predict_score' column
+score = df['predict_score']
 
 confusion_matrix = metrics.confusion_matrix(actual, predicted)
 
@@ -190,6 +177,24 @@ import numpy as np
 cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = ['absent', 'present'])
 cm_display.plot()
 plt.show()
+
+
+# Function to evaluate model's performance with wandb (F1, Precision, Recall)
+from sklearn.metrics import f1_score, precision_score, recall_score, average_precision_score
+
+f1 = f1_score(actual, predicted)
+print('f1:', f1)
+
+precision = precision_score(actual, predicted)
+print('precision', precision)
+
+recall = recall_score(actual, predicted)
+print('recall', recall)
+
+mAP = average_precision_score(actual, score)
+print('mAP', mAP)
+
+# The average ROC AUC, precision-recall  AUC, average maximum F1 scores, optimal threshold values, and average precision  and recall scores associated with the optimal threshold are listed in Table 3.
 
 # Histogram for binary predictions
 fig, axs = plt.subplots(1,1, figsize = (20,40))
