@@ -23,10 +23,10 @@ library(apcluster)
 library(tidyverse)
 
 ##### Save all .wav files and set working directory to access the files
-setwd("C:\\Users\\User\\Desktop\\Pika_Data_Analysis_copy_Oct2024\\Individuality")
+setwd("C:\\PythonGitHub\\Mittelstaedt_Undergrad_Thesis\\Individuality\\Whole_dataset_potential_ind_clips\\Edited_PP_individual_clips")
 
 input.dir <-
-  "C:\\Users\\User\\Desktop\\Pika_Data_Analysis_copy_Oct2024\\Individuality"
+  "C:\\PythonGitHub\\Mittelstaedt_Undergrad_Thesis\\Individuality\\Whole_dataset_potential_ind_clips\\Edited_PP_individual_clips"
 
 ####List all .wav files in directory
 L = list.files(input.dir, pattern = "*.wav", full.names = FALSE)
@@ -49,7 +49,7 @@ for (j in 1:length(filehandles)) {
     w <- readWave(filename)
     
     # Find duration of .wav file and divide into 5 windows
-    wav.dur <- duration(w)
+    wav.dur <- length(w) / w@samp.rate
     win.time <- wav.dur / 9
     
     # Calculate MFCCs
@@ -119,7 +119,7 @@ str(mfcc.data.frame)
 #remove non-MFCC columns
 x <- mfcc.data.frame |> select(-c(loc, filehandles, id, dur))
 x
-x2 <- x |> select(31:35)
+x2 <- x |> select(1:136)
 x2
 
 
@@ -138,6 +138,7 @@ aggres1 <- aggExCluster(x=apres)
 ## show dendrograms
 plot(aggres1)
 plot(aggres1, showSamples=TRUE)
+
 
 ## show clustering result for 4 clusters*
 plot(aggres1, x2, k=4)
