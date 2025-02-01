@@ -140,20 +140,5 @@ plot(aggres1)
 plot(aggres1, showSamples=TRUE)
 
 
-## show clustering result for 4 clusters*
-plot(aggres1, x2, k=4)
-
-## perform agglomerative clustering of whole data set
-aggres2 <- aggExCluster(negDistMat(r=2), x2)
-
-## show dendrogram
-plot(aggres2)
-
-## show heatmap along with dendrogram
-heatmap(aggres2)
-
-## show clustering result for 2 clusters*
-plot(aggres2, x2, k=2)
-
 
 
