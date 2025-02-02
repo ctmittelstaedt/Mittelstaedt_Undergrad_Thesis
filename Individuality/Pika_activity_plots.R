@@ -22,8 +22,13 @@ fwrite(merged_data, "C:/PythonGitHub/Mittelstaedt_Undergrad_Thesis/Recognizers/P
 # Set working directory
 setwd("C:/PythonGitHub/Mittelstaedt_Undergrad_Thesis/Recognizers/Predict/complete_predictions")
 
+# Set file path to file with sunrise, sunset, solar noon
+sun_times <- fread("C:/PythonGitHub/Mittelstaedt_Undergrad_Thesis/Recognizers/Predict/sunset_sunrise/sunrise_sunset_summer2024.csv")
+
 # Get a list of all CSV files in the working directory
 csv_files <- list.files(pattern = "*.csv")
+
+head(csv_file_1)
 
 # This maps PIKARU6 to PIKARU1, PIKARU7 to PIKARU2, etc.
 device_colors <- c("PIKARU1" = "deepskyblue", 
@@ -42,6 +47,84 @@ device_colors <- c("PIKARU1" = "deepskyblue",
                    "PIKARU14" = "darkmagenta",
                    "PIKARU15" = "goldenrod3")
 
+# Function to process and plot each CSV file
+process_and_plot <- function(csv_file) {
+  # Read the CSV file into a data.table
+  predictions_dt <- fread(csv_file)
+  
+  # Filter the data.table to remove unwanted overlapping clips and set score threshold to 6
+  filtered_predictions <- predictions_dt[seq(1, .N, by = 2) & PIKA > 14]
+  
+  # Restructure the data table by device, date, and time
+  filtered_predictions[, `:=`(
+    device = sub(".*\\\\(PIKARU\\d+).*", "\\1", file),
+    date = sub(".*_(\\d{8})_.*", "\\1", file),
+    time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+  )]
+  
+  # Convert time to numeric
+  filtered_predictions[, time := as.numeric(time)]
+  
+  # Extract the hour from the time, rounding to the nearest hour
+  filtered_predictions[, hour := floor(time / 10000)]  # This divides by 10,000 to get the hour part
+  
+  # Count the number of occurrences per device, date, and hour
+  summary_table_hourly <- filtered_predictions[, .N, by = .(device, date, hour)]
+  
+  # Rename the count column
+  setnames(summary_table_hourly, "N", "count")
+  
+  # Get the corresponding sun times for this CSV file
+  sun_time_for_csv <- sun_times[csv == basename(csv_file)]  # Match CSV name
+  
+  # Extract the sun times (sunrise, solar noon, sunset)
+  sunrise_time <- sun_time_for_csv$sunrise
+  solar_noon_time <- sun_time_for_csv$solar_noon
+  sunset_time <- sun_time_for_csv$sunset
+  
+  # Convert times to numeric format (removing colon, e.g., "5:15" -> 515)
+  sunrise_hour <- as.numeric(substr(sunrise_time, 1, 2)) # Extract the hour (HH)
+  sunrise_minute <- as.numeric(substr(sunrise_time, 4, 5)) # Extract the minutes (MM)
+  sunrise_time_num <- sunrise_hour + sunrise_minute / 60  # Convert to decimal hour
+  
+  solar_noon_hour <- as.numeric(substr(solar_noon_time, 1, 2))
+  solar_noon_minute <- as.numeric(substr(solar_noon_time, 4, 5))
+  solar_noon_time_num <- solar_noon_hour + solar_noon_minute / 60
+  
+  sunset_hour <- as.numeric(substr(sunset_time, 1, 2))
+  sunset_minute <- as.numeric(substr(sunset_time, 4, 5))
+  sunset_time_num <- sunset_hour + sunset_minute / 60
+  
+  # Create a plot of time vs #pika calls for each day at each site
+  plot <- ggplot(summary_table_hourly, aes(x = hour, y = count, color = device)) +
+    geom_point() +
+    geom_line() +
+    labs(
+      title = paste(csv_file),  
+      x = "Hour of day",
+      y = "Number of calls per hour"
+    ) +
+    theme_minimal() +
+    theme(panel.grid = element_blank(),
+          axis.line = element_line(color = "black", linewidth = 0.3)) +
+    scale_color_manual(values = device_colors) +  # Apply the custom color mapping
+    guides(color = guide_legend(title = NULL)) +  # Remove legend title
+    ylim(0, 100) +
+    # Add vertical dashed lines for sunrise, solar noon, and sunset
+    geom_vline(xintercept = solar_noon_time_num, linetype = "dashed", color = "blue") +
+    geom_vline(xintercept = sunset_time_num, linetype = "dashed", color = "blue") +
+    geom_vline(xintercept = sunrise_time_num, linetype = "dashed", color = "blue")
+  
+  # Return the plot
+  return(plot)
+}
+
+# Use purrr::map() to process each CSV and generate a list of plots
+plots <- map(csv_files, process_and_plot)
+
+grid.arrange(grobs = plots, ncol = 2)
+
+########################################
 
 # Function to process and plot each CSV file
 process_and_plot <- function(csv_file) {
