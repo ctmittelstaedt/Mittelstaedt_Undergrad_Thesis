@@ -45,7 +45,13 @@ device_colors <- c("PIKARU1" = "deepskyblue",
                    "PIKARU12" = "darksalmon", 
                    "PIKARU13" = "darkseagreen",
                    "PIKARU14" = "darkmagenta",
-                   "PIKARU15" = "goldenrod3")
+                   "PIKARU15" = "goldenrod3",
+                   "PIKARU21" = "deepskyblue", 
+                   "PIKARU22" = "darksalmon", 
+                   "PIKARU23" = "darkseagreen",
+                   "PIKARU24" = "darkmagenta",
+                   "PIKARU25" = "goldenrod3",
+                   "PIKARU20" = "goldenrod3")
 
 # Function to process and plot each CSV file
 process_and_plot <- function(csv_file) {
@@ -132,7 +138,7 @@ process_and_plot <- function(csv_file) {
   predictions_dt <- fread(csv_file)
   
   # Filter the data.table to remove unwanted overlapping clips and set score threshold to 6
-  filtered_predictions <- predictions_dt[seq(1, .N, by = 2) & PIKA > 14]
+  filtered_predictions <- predictions_dt[seq(1, .N, by = 2) & PIKA > 10]
   
   # Restructure the data table by device, date, and time
   filtered_predictions[, `:=`(
@@ -156,18 +162,22 @@ process_and_plot <- function(csv_file) {
   # Create a plot of time vs #pika calls for each day at each site
   plot <- ggplot(summary_table_hourly, aes(x = hour, y = count, color = device)) +
     geom_point() +
-    geom_line() +
+    geom_line(linewidth=1) +
     labs(
-      title = paste(csv_file),  
+      #title = paste(csv_file),  
       x = "Hour of day",
       y = "Number of calls per hour"
     ) +
     theme_minimal() +
     theme(panel.grid = element_blank(),
-          axis.line = element_line(color = "black", linewidth = 0.3)) +
+          axis.line = element_line(color = "black", linewidth = 0.8),
+          axis.title.x = element_text(size = 14, margin = margin(t = 10)),  # Increase font size and spacing
+          axis.title.y = element_text(size = 14, margin = margin(r = 10)),  # Increase font size and spacing
+          axis.text = element_text(size = 12),  # Increase axis text size
+          legend.position = "none") +
     scale_color_manual(values = device_colors) +  # Apply the custom color mapping
     guides(color = guide_legend(title = NULL)) +  # Remove legend title
-    ylim(0,100)
+    ylim(0,60)
     
   # Return the plot
   return(plot)
