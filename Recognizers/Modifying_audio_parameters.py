@@ -8,10 +8,9 @@
 
 # Set the backend and import matplotlib
 import os
-os.environ['MPLBACKEND'] = 'TkAgg'  # or 'Agg', 'Qt5Agg', etc.
+os.environ['MPLBACKEND'] = 'TkAgg' 
 
 import matplotlib.pyplot as plt
-
 import matplotlib
 
 # Choose the backend 
@@ -22,11 +21,11 @@ from opensoundscape import Audio, Spectrogram
 from pathlib import Path
 
 # Load audio file
-audio_object = Audio.from_file("C:\\Users\\User\\Desktop\\All_annotations_all_pika\\PP_training_data\\PIKARU6\\PIKARU6_20240719_120002.wav")
+audio_object = Audio.from_file("C:/Users/User/Desktop/temp_test/PIKARU25_20240808_212002.wav")
 audio_object
 
 # Trim audio to centre pika call in the spectrogram frame and apply bandpass filter
-trimmed = audio_object.trim(168.36,168.72)#.bandpass(0,15000,order=1)
+trimmed = audio_object.trim(15.98,16.38)
 
 # Create a spectrogram object
 spectrogram_object = Spectrogram.from_audio(trimmed,
