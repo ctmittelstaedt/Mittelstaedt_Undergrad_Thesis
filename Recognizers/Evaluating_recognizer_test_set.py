@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from glob import glob
 import subprocess
+import os
 
 
 #set up plotting
@@ -17,87 +18,78 @@ from matplotlib import pyplot as plt
 plt.rcParams['figure.figsize']=[15,5] #for large visuals
 
 #load model
-#model = load_model("./model_training_checkpoints/best.model")
+#model = load_model("./model_training_checkpoints/epoch-99.model")
 #model = load_model("C:/Users/User/Desktop/best.model")
 
 ##################From recognizer code to create test set so that I can play around with it.
 # Make a list of all of the selection table files
-raven_files = glob("./raven_data/*/*.txt")
+#raven_files = sorted(glob("./raven_data/*/*.txt"))
 
 # Create a list of audio files, one corresponding to each Raven file (Audio files have the same names as selection files with a different extension)
-audio_files = glob("./audio_data/*/*.wav") + glob("./audio_data/*/*.mp3")
+#audio_files = sorted(glob("./audio_data/*/*.wav") + glob("./audio_data/*/*.mp3"))
 
 from opensoundscape.annotations import BoxedAnnotations
 # Create a dataframe of annotations
-annotations = BoxedAnnotations.from_raven_files(
-    raven_files, 
-    "Annotation",
-    audio_files, 
-    keep_extra_columns=['Selection','View', 'Channel','Begin Time (s)', 'End Time (s)', 'Low Freq (Hz)', 'High Freq (Hz)','Annotation'])
+#annotations = BoxedAnnotations.from_raven_files(
+    #raven_files, 
+    #"Annotation",
+    #audio_files, 
+    #keep_extra_columns=['Selection','View', 'Channel','Begin Time (s)', 'End Time (s)', 'Low Freq (Hz)', 'High Freq (Hz)','Annotation'])
 
 # Access the underlying DataFrame
-annotations_data = annotations.df
-annotations_data.to_csv("./All_annotations_copy/annotations_data.csv")
+#annotations_data = annotations.df
+#annotations_data.to_csv("./All_annotations_copy/annotations_data.csv")
 
 # Parameters to use for label creation*changed from 0.4 to 0.3
-clip_duration = 0.3
-clip_overlap = 0.15
-min_label_overlap = 0.07
-species_of_interest = ["PIKA"] 
+#clip_duration = 0.3
+#clip_overlap = 0.0
+#min_label_overlap = 0.07
+#min_label_fraction = 0.8
+#species_of_interest = ["PIKA"] 
 
 # Create dataframe of one-hot labels
-clip_labels = annotations.clip_labels(
-    clip_duration = clip_duration,
-    clip_overlap = clip_overlap,
-    min_label_overlap = min_label_overlap,
-    class_subset = species_of_interest # You can comment this line out if you want to include all species.
-)
+#clip_labels = annotations.clip_labels(
+    #clip_duration = clip_duration,
+    #clip_overlap = clip_overlap,
+    #min_label_overlap = min_label_overlap,
+    #min_label_fraction = min_label_fraction,
+    #class_subset = species_of_interest # You can comment this line out if you want to include all species.
+#)
 
 # Access the underlying DataFrame
-clip_labels.to_csv("./All_annotations_copy/clip_labels.csv")
+#clip_labels.to_csv("./All_annotations_copy/clip_labels.csv")
 
 # Select all files from testing_data_raven as a test set
-mask = clip_labels.reset_index()['file'].apply(lambda x: 'testing_data_audio' in x).values
-test_set = clip_labels[mask]
+#mask = clip_labels.reset_index()['file'].apply(lambda x: 'testing_data_audio' in x).values
+#test_set = clip_labels[mask]
 
 # All other files will be used as a training set
-train_and_val_set = clip_labels.drop(test_set.index)
+#train_and_val_set = clip_labels.drop(test_set.index)
 
 # Save .csv tables of the training and validation sets to keep a record of them
-test_set.to_csv("./All_annotations_copy/test_set.csv")
+#test_set.to_csv("./All_annotations_copy/test_set.csv")
 
 #load the table listing files in the test set 
 test_set = pd.read_csv('./All_annotations_copy/test_set.csv',index_col=[0,1,2])
 
+
+#####PREPROCESS
+from opensoundscape.preprocess.preprocessors import SpectrogramPreprocessor
+from opensoundscape.ml.datasets import AudioFileDataset, AudioSplittingDataset
+from opensoundscape import preprocess
+import IPython.display as ipd
+from opensoundscape.preprocess.utils import show_tensor, show_tensor_grid
+from opensoundscape.ml.utils import collate_audio_samples_to_tensors
+from opensoundscape.ml.dataloaders import SafeAudioDataloader
+
+#preprocessor = SpectrogramPreprocessor(sample_duration=0.3) # sample_duration must match clip_duration
+#train_dataset = AudioFileDataset(test_set, preprocessor)
+#preprocessor.pipeline
+#preprocessor.pipeline.bandpass.set(min_f=700,max_f=6000) # eliminate unnecessary frequencies
+#preprocessor.pipeline.to_spec.params['overlap_fraction'] = 0.9 # fractional temporal overlap between consecutive windows
+#preprocessor.pipeline.to_spec.params
+
 #############################################
-
-#*balancing the negatives and positives so there are 2x negatives as positives
-from opensoundscape.data_selection import resample
-from sklearn.utils import shuffle
-
-# Identify positives (rows where any column is TRUE)
-#positives = test_set[test_set['PIKA'] > 0]
-
-# Identify negatives (rows where any column is FALSE)
-#negatives = test_set[test_set['PIKA'] == 0]
-
-# Check how many positives and negatives there are
-#num_positives = len(positives)
-#num_negatives = len(negatives)
-
-# Now sample the negatives to achieve twice as many negatives as positives
-#num_negatives_to_sample = min(2 * num_positives, num_negatives)
-
-# Sample exactly `num_negatives_to_sample` negatives without replacement
-#negatives_downsampled = negatives.sample(num_negatives_to_sample, replace=False, random_state=0) #random_state for reproducibility
-
-# Concatenate positives and downsampled negatives into a balanced training set
-#test_set = pd.concat([positives, negatives_downsampled])
-
-# Add shuffling to randomize
-#test_set = shuffle(test_set, random_state=0) #random_state for reproducibility
-
-#################################
 
 from opensoundscape import Audio
 
@@ -106,6 +98,7 @@ from opensoundscape import Audio
 
 # run "inference": use the CNN to predict the presence of each class in the audio clips
 #predictions = model.predict(test_set,
+                            #clip_overlap = 0.15,
                             #num_workers=0,
                             #batch_size=1000
 #)
@@ -186,35 +179,15 @@ f1 = f1_score(actual, predicted)
 print('f1:', f1)
 
 precision = precision_score(actual, predicted)
-print('precision', precision)
+print('precision:', precision)
 
 recall = recall_score(actual, predicted)
-print('recall', recall)
+print('recall:', recall)
 
-mAP = average_precision_score(actual, score)
-print('mAP', mAP)
+#mAP = average_precision_score(actual, score)
+#print('mAP:', mAP)
 
 # The average ROC AUC, precision-recall  AUC, average maximum F1 scores, optimal threshold values, and average precision  and recall scores associated with the optimal threshold are listed in Table 3.
-
-# Histogram for binary predictions
-fig, axs = plt.subplots(1,1, figsize = (20,40))
-axs = np.ravel(axs)
-for ax, species in enumerate(model.classes):
-    positives = test_set[species] == 1
-    negatives = test_set[species] == 0
-    positive_predictions = binary_predictions.loc[positives.index]
-    negative_predictions = binary_predictions.loc[negatives.index]
-    axs[ax].hist(positive_predictions, alpha=0.5, color="red", label="Positives")
-    axs[ax].hist(negative_predictions, alpha=0.5, color="blue", label="Negatives")
-    axs[ax].set_yscale("log")
-    axs[ax].title.set_text(species)
-    axs[ax].set_ylabel("Number of audio segments")
-    axs[ax].set_xlabel("Score")
-    axs[ax].legend()
-
-
-plt.tight_layout(pad=15.0)
-plt.show()
 
 # Histogram for predictions
 fig, axs = plt.subplots(1,1, figsize = (10,20))
@@ -225,7 +198,6 @@ for ax, species in enumerate(model.classes):
     axs[ax].hist(predictions[positives][species], alpha=0.5, color="red", label="Positives")
     axs[ax].hist(predictions[negatives][species], alpha=0.5, color="blue", label="Negatives")
     axs[ax].set_yscale("log")
-    axs[ax].title.set_text(species)
     axs[ax].set_ylabel("Number of audio segments")
     axs[ax].set_xlabel("Score")
     axs[ax].legend()
