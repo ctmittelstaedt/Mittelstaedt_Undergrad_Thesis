@@ -240,8 +240,6 @@ Recognizers/evaluating_test_set_histograms/test_Jan1.png
 *.prj
 *.shx
 *.dbf
-SDM/iNaturalist/observations-517827.csv
-SDM/Yukon_gov/YCDC_Pika_visit_data.xlsx
 *.png
 *.qgz
-*.csv
+
