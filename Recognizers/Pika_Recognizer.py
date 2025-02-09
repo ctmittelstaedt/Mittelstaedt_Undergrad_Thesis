@@ -1,20 +1,7 @@
-
-import wandb
-try:
-   wandb.login()
-   wandb_session = wandb.init(
-       entity='ctmittelstaedt-university-of-british-columbia', 
-       project='Pika Recognizer',
-       name='Trial 13',
-    )
-except: #if wandb.init fails, don't use wandb logging
-    print('failed to create wandb session. wandb session will be None')
-    wandb_session = None
-
-# the cnn module provides classes for training/predicting with various types of CNNs
+# The cnn module provides classes for training/predicting with various types of CNNs
 from opensoundscape import CNN
 
-#other utilities and packages
+# Other utilities and packages
 import torch
 import pandas as pd
 from pathlib import Path
@@ -26,7 +13,7 @@ from glob import glob
 import sklearn
 import os
 
-# *For preprocessor
+# For preprocessor
 from opensoundscape.preprocess.preprocessors import SpectrogramPreprocessor
 from opensoundscape.ml.datasets import AudioFileDataset, AudioSplittingDataset
 from opensoundscape import preprocess
@@ -35,52 +22,59 @@ from opensoundscape.preprocess.utils import show_tensor, show_tensor_grid
 from opensoundscape.ml.utils import collate_audio_samples_to_tensors
 from opensoundscape.ml.dataloaders import SafeAudioDataloader
 
-#set up plotting
+# Set up plotting
 from matplotlib import pyplot as plt
 from matplotlib import rcParams
-plt.rcParams['figure.figsize']=[15,5] #for large visuals
+#plt.rcParams['figure.figsize']=[15,5] #for large visuals
 
-rcParams['figure.figsize'] = (10, 6)  # Example of setting figure size
-rcParams['figure.dpi'] = 100           # Example of setting dpi
+#rcParams['figure.figsize'] = (10, 6)  # Example of setting figure size
+#rcParams['figure.dpi'] = 100           # Example of setting dpi
 
-# take these out when running actual model
-torch.manual_seed(0)
-random.seed(0)
-np.random.seed(0)
+# Initiate wandb performance logging
+import wandb
+try:
+   wandb.login()
+   wandb_session = wandb.init(
+       entity='ctmittelstaedt-university-of-british-columbia', 
+       project='Pika Recognizer',
+       name='last2',
+    )
+except: #if wandb.init fails, don't use wandb logging
+    print('failed to create wandb session. wandb session will be None')
+    wandb_session = None
 
-
-# Set the current directory to where the dataset is downloaded
-#dataset_path = Path("./All_annotations_copy/")
+# Set seeds for reproducibility. Remove when running final model
+#torch.manual_seed(0)
+#random.seed(0)
+#np.random.seed(0)
 
 # Make a list of all of the selection table files
-raven_files = glob("./raven_data/*/*/*.txt")
-
+raven_files = sorted(glob("./raven_data/*/*.txt"))
 
 # Create a list of audio files, one corresponding to each Raven file 
 # (Audio files have the same names as selection files with a different extension)
-audio_files = glob("./audio_data/*/*/*.wav") + glob("./audio_data/*/*/*.mp3")
-
+audio_files = sorted(glob("./audio_data/*/*.wav") + glob("./audio_data/*/*.mp3"))
 
 from opensoundscape.annotations import BoxedAnnotations
+
 # Create a dataframe of annotations
 annotations = BoxedAnnotations.from_raven_files(
     raven_files, 
     "Annotation",
     audio_files, 
-    keep_extra_columns=['Selection','View', 'Channel','Begin Time (s)', 'End Time (s)', 'Low Freq (Hz)', 'High Freq (Hz)','Annotation'])
-
+    keep_extra_columns=['Selection','View', 'Channel','Begin Time (s)', 
+                        'End Time (s)', 'Low Freq (Hz)', 'High Freq (Hz)','Annotation'])
 
 # Access the underlying DataFrame
-#annotations_data = annotations.df
-#annotations_data.to_csv("./Recognizers/All_annotations_copy/annotations_data.csv")
+annotations_data = annotations.df
+annotations_data.to_csv("./All_annotations_copy/annotations_data.csv")
 
-# Parameters to use for label creation*changed from 0.4 to 0.3
-clip_duration = 0.3
-clip_overlap = 0.15
-min_label_overlap = 0.1
-min_label_fraction = 0.7
-
-species_of_interest = ["PIKA"] 
+# Parameters to use for label creation
+clip_duration = 0.3 # clip length (s)
+clip_overlap = 0.15 # clip overlap (s)
+min_label_overlap = 0.07 # 0.07 s of annotated call must be included to be considered "positive"
+min_label_fraction = 0.8 # OR 80% of annotated call must be included
+species_of_interest = ["PIKA"] # matches annotation label
 
 # Create dataframe of one-hot labels
 clip_labels = annotations.clip_labels(
@@ -98,20 +92,18 @@ clip_labels.to_csv("./All_annotations_copy/clip_labels.csv")
 mask = clip_labels.reset_index()['file'].apply(lambda x: 'testing_data_audio' in x).values
 test_set = clip_labels[mask]
 
-# All other files will be used as a training set
+# All other files will be used as a training/validation set
 train_and_val_set = clip_labels.drop(test_set.index)
 
-# Save .csv tables of the training and validation sets to keep a record of them
+# Save .csv tables of the training/validation and test sets to keep a record of them
 train_and_val_set.to_csv("./All_annotations_copy/train_and_val_set.csv")
 test_set.to_csv("./All_annotations_copy/test_set.csv")
 
 train_and_val_set = pd.read_csv('./All_annotations_copy/train_and_val_set.csv',index_col=[0,1,2])
 test_set = pd.read_csv('./All_annotations_copy/test_set.csv',index_col=[0,1,2])
 
-#show_tensor(train_and_val_set.data,transform_from_zero_centered=True)
 
-
-#*balancing the negatives and positives so there are 2x negatives as positives
+# Balance the negatives and positives so there are 2x the number of negatives as positives
 from opensoundscape.data_selection import resample
 # Identify positives (rows where any column is TRUE)
 positives = train_and_val_set[train_and_val_set['PIKA'] > 0]
@@ -123,80 +115,59 @@ negatives = train_and_val_set[train_and_val_set['PIKA'] == 0]
 num_positives = len(positives)
 num_negatives = len(negatives)
 
-# Now sample the negatives to achieve twice as many negatives as positives
+# Sample the negatives to achieve twice as many negatives as positives
 num_negatives_to_sample = min(2 * num_positives, num_negatives)
 
 # Sample exactly `num_negatives_to_sample` negatives without replacement
-negatives_downsampled = negatives.sample(num_negatives_to_sample, replace=False, random_state=0)
+negatives_downsampled = negatives.sample(num_negatives_to_sample, replace=False) # random state for reproducibility
 
 # Concatenate positives and downsampled negatives into a balanced training set
 balanced_train_and_val_set = pd.concat([positives, negatives_downsampled])
+# Shuffle to randomize order of clips
+from sklearn.utils import shuffle
+balanced_train_and_val_set = shuffle(balanced_train_and_val_set) # random_state for reproducibility
 
-num_negatives_downsampled = len(negatives_downsampled)
-print(f"Number of positives: {num_positives}")
-print(f"Number of negatives: {num_negatives_downsampled}")
-
-# Add shuffling to randomize order
-#from sklearn.utils import shuffle
-#balanced_train_and_val_set = shuffle(balanced_train_and_val_set, random_state=0) #random_state for reproducibility
-
-
-
-# Split our training data into training and validation sets
-train_df, valid_df = sklearn.model_selection.train_test_split(balanced_train_and_val_set, test_size=0.2, random_state=0) # made test_size = 0.2 to split data into 20% validation, random_state ensures reproducibility
+# Split training data into training and validation sets
+train_df, valid_df = sklearn.model_selection.train_test_split(balanced_train_and_val_set, test_size=0.2) # test_size = 0.2 to split data into 20% validation, random_state ensures reproducibility
 train_df.to_csv("./All_annotations_copy/train_set.csv")
 valid_df.to_csv("./All_annotations_copy/valid_set.csv")
 
-# *Modify the default preprocessor**could add dB modifications
-#preprocessor = SpectrogramPreprocessor(sample_duration=0.3) # changed from 2 to match other durations
-#train_dataset = AudioFileDataset(train_df, preprocessor)
-#preprocessor.pipeline
-#preprocessor.pipeline.bandpass.set(min_f=700,max_f=6000)
-#preprocessor.pipeline.to_spec.params['overlap_fraction'] = 0.9
-#preprocessor.pipeline.to_spec.params
-#print(preprocessor.pipeline.to_spec.params) #check preprocessor parameters
+# Modify the default preprocessor for training data **could add dB modifications
+preprocessor = SpectrogramPreprocessor(sample_duration=0.3) # sample_duration must match clip_duration
+train_dataset = AudioFileDataset(train_df, preprocessor)
+preprocessor.pipeline
+preprocessor.pipeline.bandpass.set(min_f=700,max_f=6500) # eliminate unnecessary frequencies
+preprocessor.pipeline.to_spec.params['overlap_fraction'] = 0.9 # fractional temporal overlap between consecutive windows
+preprocessor.pipeline.to_spec.params
+#print(preprocessor.pipeline.to_spec.params) # double check preprocessor parameters
 
-#show_tensor(train_dataset[0].data)
+preprocessor = SpectrogramPreprocessor(sample_duration=0.3) # sample_duration must match clip_duration
+valid_dataset = AudioFileDataset(valid_df, preprocessor)
+preprocessor.pipeline
+preprocessor.pipeline.bandpass.set(min_f=700,max_f=6500) # eliminate unnecessary frequencies
+preprocessor.pipeline.to_spec.params['overlap_fraction'] = 0.9 # fractional temporal overlap between consecutive windows
+preprocessor.pipeline.to_spec.params
+#print(preprocessor.pipeline.to_spec.params) # double check preprocessor parameters
 
-#print(train_dataset)
-#train_dataset_df = train_dataset.df
-#train_dataset_df.to_csv("./All_annotations_copy/train_dataset.csv")
+# Visualize preprocessed tensors
+#tensors = [train_dataset[i].data for i in range(16,25)]
+#_ = show_tensor_grid(tensors,3)
+#plt.show()
 
-#print("this is the preprocessor dataset", train_dataset)
-
-# *Modify the default preprocessor**could add dB modifications
-#preprocessor = SpectrogramPreprocessor(sample_duration=0.3) # changed from 2 to match other durations
-#val_dataset = AudioFileDataset(valid_df, preprocessor)
-#preprocessor.pipeline
-#preprocessor.pipeline.bandpass.set(min_f=700,max_f=6000)
-#preprocessor.pipeline.to_spec.params['overlap_fraction'] = 0.9
-#preprocessor.pipeline.to_spec.params
-#print(preprocessor.pipeline.to_spec.params) #check preprocessor parameters
-
-#train_dataset.to_csv("./All_annotations_copy/train_dataset.csv")
-#val_dataset.to_csv("./All_annotations_copy/val_dataset.csv")
-#NoiseReduceAudioPreprocessor(AudioPreprocessor)
-
-# upsample (repeat samples) so that all classes have 80 samples
-#balanced_train_df = resample(train_df,n_samples_per_class=80,random_state=0)
-
-
-# Create a CNN object designed to recognize 3-second samples
-from opensoundscape import CNN
-
-# Use resnet34 architecture
+# Define model architecture
 architecture = 'resnet34'
 
-# Can use this code to get your classes, if needed
+# Get class
 class_list = list(train_df.columns)
 
+# Create CNN
 model = CNN(
     architecture = architecture,
     classes = class_list,
-    sample_duration = clip_duration #3s, selected above
+    sample_duration = clip_duration # 3s, selected above
 )
 
-# Parallel computing if possible 
+# Parallel computing to speed up training
 import torch
 if torch.backends.mps.is_available():
     model.device='mps' #Apple Silicon
@@ -204,56 +175,24 @@ elif torch.cuda.is_available():
     model.device='cuda' #CUDA GPU  
 print(f'model.device is: {model.device}')
 
+# Define checkpoint folder for saving training checkpoints
 checkpoint_folder = Path("model_training_checkpoints")
 checkpoint_folder.mkdir(exist_ok=True)
 
-### ####################
-
-# Function to evaluate model's performance with wandb (F1, Precision, Recall)
-from sklearn.metrics import f1_score, precision_score, recall_score
-
-def evaluate(model, valid_df):
-    model.eval()
-    y_true = []
-    y_pred = []
-    
-    with torch.no_grad():
-        for data in valid_df:
-            inputs, targets = data
-            outputs = model(inputs)
-            predicted_labels = outputs.argmax(dim=1)  # Get predicted labels (for classification)
-
-            y_true.extend(targets.numpy())  # Assuming targets are numpy arrays
-            y_pred.extend(predicted_labels.numpy())  # Convert tensor to numpy array
-    
-    # Calculate metrics
-    f1 = f1_score(y_true, y_pred, average='macro')
-    precision = precision_score(y_true, y_pred, average='macro')
-    recall = recall_score(y_true, y_pred, average='macro')
-    
-    return f1, precision, recall
-
-#print(train_dataset)
-#print(val_dataset)
-
-# train model
+# Train model
 if __name__ == '__main__':
     
     model.train(
     train_df,
     valid_df,
-    epochs = 3,
-    batch_size = 64,
-    log_interval = 100, #log progress every 100 batches
-    num_workers = 6, #4 parallelized cpu tasks for preprocessing
-    wandb_session=wandb_session, #wandb_session,
-    save_interval = 10, #save checkpoint every 10 epochs
-    save_path = checkpoint_folder #location to save checkpoints
+    epochs = 100, # based on when learning plateaus
+    batch_size = 200,
+    log_interval = 100, # log progress every 100 batches
+    num_workers = 6, # parallelized cpu tasks for preprocessing
+    wandb_session=wandb_session, 
+    save_interval = 2, # save checkpoint every 10 epochs
+    save_path = checkpoint_folder # location to save checkpoints
 )
 
+# Map CNN outputs
 scores_df = model.predict(valid_df.head(),activation_layer='sigmoid')
-
-#plt.scatter(model.loss_hist.keys(),model.loss_hist.values())
-#plt.xlabel('epoch')
-#plt.ylabel('loss')
-#plt.show()
