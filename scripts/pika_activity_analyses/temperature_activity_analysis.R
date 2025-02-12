@@ -25,11 +25,23 @@ filtered_pikaru <- merged_data[grepl("PIKARU5|PIKARU10|PIKARU15|PIKARU25", file)
 
 saveRDS(filtered_pikaru, file = "recognizer_outputs/predictions/all_sites_weather_predictions.RDS")
 
-# Get the unique values in the 'file' column
-unique_file_names <- unique(filtered_pikaru$file)
+binary_pikaru <- filtered_pikaru[seq(1, .N, by = 2) & PIKA > 10]
 
-# Count the number of unique values
-num_unique_file_names <- length(unique_file_names)
+processed_pikaru <- binary_pikaru[, .(
+  site = ifelse(grepl("PIKARU5", file), "PC",
+                ifelse(grepl("PIKARU10", file), "PP",
+                       ifelse(grepl("PIKARU15", file), "MD",
+                              ifelse(grepl("PIKARU25", file), "MB", NA)))),
+  date = sub(".*/[^/]+_(\\d{8})_(\\d{6})\\.wav", "\\1", file))  # Extract date from file name
+  , by = file]
 
-# Print the number of unique file names
-print(num_unique_file_names)
+site_date_count <- processed_pikaru[, .(count = .N), by = .(site, date)]
+
+weather_data <- fread("data/pika_activity/weather_all_sites.csv")
+
+# convert date to character
+site_date_count$date <- as.character(site_date_count$date)
+weather_data$date <- as.character(weather_data$date)
+
+weather_vs_calls <- merge(site_date_count, weather_data, by = c("site","date"), all.x = TRUE)
+
