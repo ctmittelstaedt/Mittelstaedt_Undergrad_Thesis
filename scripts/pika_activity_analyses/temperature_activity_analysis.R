@@ -1,4 +1,8 @@
 # Temperature vs activity
+library(tidyverse) # data manipulation (includes ggplot2)
+library(tidybayes) # easy retrivale of BRM prediction
+library(brms) # bayesian model fitting
+library(data.table)
 
 # Make extra weather days .Rdata
 weather_extras <- fread(file.path("data","pika_activity","predict_score_weather_extras.csv"))
@@ -44,4 +48,41 @@ site_date_count$date <- as.character(site_date_count$date)
 weather_data$date <- as.character(weather_data$date)
 
 weather_vs_calls <- merge(site_date_count, weather_data, by = c("site","date"), all.x = TRUE)
+
+
+################################BAYESIAN MODEL############################################
+
+# Set prior
+prior1 <-
+
+## Set up model with site as a random effect
+weather_model_1 <- brm(
+  count ~ max_temp + 
+          daily_rainfall + 
+          avg_wind_speed + 
+          (1 + max_temp + daily_rainfall + avg_wind_speed | site)
+  weather_vs_calls,
+  family = ,
+  prior = prior1,
+  cores = 3,
+  chains = 3,
+  iter = 4000,
+  warmup = 1500)
+
+
+## create a data frame of predictions of our model
+predictions <- add_predicted_draws(weather_vs_calls,
+                                   weather_model_1) 
+
+ggplot(weather_vs_calls,aes(YEAR,RelCover,color = site,site ))+
+  stat_lineribbon(data = predictions,aes(y = .prediction),.width = c(0.2), alpha = 0.25)+ ## 95% credible interval
+  stat_lineribbon(data = predictions,aes(y = .prediction),.width = c(0), alpha = 1)+ ## mean
+  geom_point()+
+  scale_color_viridis_d()+
+  scale_fill_viridis_d()+
+  theme_bw()+
+  labs(x= "Year",y="Grass cover (%)",color = "Subsite",fill = "Subsite")
+## results: this may or may not happen
+
+class(weather_model_1)
 

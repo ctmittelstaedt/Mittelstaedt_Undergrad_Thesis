@@ -33,7 +33,23 @@ new_table_full[is.na(count), `:=`(
 # View the final result
 head(new_table_full)
 
-humans_present <- new_table_full %>%
+humans_present_table <- new_table_full %>%
   mutate(humans_present = ifelse(date %in% c(20240808, 20240726, 20240718), "Y", "N"))
 
-# Create Bayesian model
+##########################BAYESIAN ANOVA#############################################
+install.packages("BayesFactor")
+library(BayesFactor)
+
+humans_present_table$humans_present <- factor(humans_present_table$humans_present)
+
+human_model1 <- anovaBF( 
+  count ~ humans_present,
+  data = humans_present_table
+)
+
+human_model1
+
+
+
+
+
