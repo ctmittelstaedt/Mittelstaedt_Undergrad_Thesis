@@ -1,5 +1,6 @@
 # Graphing pika activity over the day and in relation to solar power
 
+#testing changes
 install.packages("data.table")
 install.packages("purrr")
 library(ggplot2)
@@ -70,8 +71,11 @@ process_and_plot <- function(rdata_file) {
   # Filter the data.table to remove unwanted overlapping clips and set score threshold to 10
   filtered_predictions <- predictions_dt[PIKA > 10]
   
-  # Take every other row (seq(1, .N, by = 2) is simplified)
-  filtered_predictions <- filtered_predictions[seq(1, .N, by = 2)]
+  # We shift the 'end_time' column by 1 to compare each row with the next
+  filtered_predictions[, overlap := shift(start_time, type = "lead") < end_time, by = file]
+  
+  # Keep only rows where there is no overlap (i.e., 'overlap' is FALSE)
+  filtered_predictions <- filtered_predictions[!overlap]
   
   # Restructure the data table by device, date, and time
   filtered_predictions[, `:=`(

@@ -1,16 +1,11 @@
 # Human presence vs pika activity
 library(data.table)
+library(tidyverse)
+library(dplyr)
 
-
-File path, site id, time (10 minutes), number of calls
-
-
-
-
-csv_file <- "C:/PythonGitHub/Mittelstaedt_Undergrad_Thesis/Recognizers/Predict/Humans/all_human_dataset.csv"
 
 # Read the CSV file into a data.table
-human_predictions_dt <- fread(csv_file)
+human_predictions_dt <- fread(file.path("data","pika_activity","all_human_dataset.csv"))
 
 file_names_dt <- unique(human_predictions_dt[, .(file)])
 
@@ -38,22 +33,7 @@ new_table_full[is.na(count), `:=`(
 # View the final result
 head(new_table_full)
 
+humans_present <- new_table_full %>%
+  mutate(humans_present = ifelse(date %in% c(20240808, 20240726, 20240718), "Y", "N"))
 
-
-# Function to process and plot each CSV file
-process_and_plot <- function(csv_file) {
-  # Read the CSV file into a data.table
-  predictions_dt <- fread(csv_file)
-  
-  # Filter the data.table to remove unwanted overlapping clips and set score threshold to 6
-  filtered_predictions <- predictions_dt[seq(1, .N, by = 2) & PIKA > 14]
-  
-  # Restructure the data table by device, date, and time
-  filtered_predictions[, `:=`(
-    device = sub(".*\\\\(PIKARU\\d+).*", "\\1", file),
-    date = sub(".*_(\\d{8})_.*", "\\1", file),
-    time = sub(".*_(\\d{6})\\.wav", "\\1", file)
-  )]
-
-
-# Bayesian model:
+# Create Bayesian model
