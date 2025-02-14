@@ -5,7 +5,11 @@ library(brms) # bayesian model fitting
 
 call_quality <- read_csv(file.path("data","recognizer","recognizer_call_quality_assessment.csv"))
 
-# Set prior
+# Create a scatterplot matrix to test multicolinearity
+pairs(~ predict_score + harmonics + power_density, 
+      data=call_quality, main="Scatterplot Matrix for call quality data")
+
+# Set prior* default prior but could change to poisson for harmonic integer
 prior1 <- c(set_prior(prior = 'normal(0,6)', class='b', coef='harmonics'), 	
             # global slope belongs to a normal distribution centered around 0
             set_prior(prior = 'normal(0,6)', class='b', coef='power_density'),

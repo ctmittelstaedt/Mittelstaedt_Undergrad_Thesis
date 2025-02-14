@@ -1,4 +1,4 @@
-file,start_time,end_time,pika_present,predict_score,binary_predictions,,,,# harmonics,avg power density,,,#false pika calls >8,#birds>8,#nothing>8,#wind>8
+file,start_time,end_time,pika_present,predict_score,binary_predictions,,,,harmonics,power_density,,,#false pika calls >8,#birds>8,#nothing>8,#wind>8
 ./audio_data\testing_data_audio\CWS-NOR_YTHEMP-RUR-265140-S1_20210618_041500.mp3,22.35,22.65,TRUE,22.323591,1,,,,4,-74.61,,,41,12,1,1
 ./audio_data\testing_data_audio\CWS-NOR_YTHEMP-RUR-265140-S2_20210613_060000.mp3,10.5,10.8,TRUE,19.747429,1,,,,6,-76.09,,,,,,
 ./audio_data\testing_data_audio\CWS-NOR_YTHEMP-RUR-276468-T3_20210623_083000.mp3,65.55,65.85,TRUE,19.096273,1,,,,6,-67.72,,,,,,
@@ -9,7 +9,7 @@ file,start_time,end_time,pika_present,predict_score,binary_predictions,,,,# harm
 ./audio_data\testing_data_audio\CWS-NOR_YTHEMP-BMP-242114-S1_20210704_064500.mp3,7.2,7.5,TRUE,15.963592,1,,,,2,-78.79,,,,,,
 ./audio_data\testing_data_audio\PIKARU25_20240808_212002.wav,10.95,11.25,TRUE,15.683794,1,,,,9,-65.15,,,,,,
 ./audio_data\testing_data_audio\PIKARU7_20240725_122002.wav,566.55,566.85,TRUE,15.140782,1,,,,5,-77.07,,,,,,
-./audio_data\testing_data_audio\PIKARU8_20240723_164002.wav,122.85,123.15,TRUE,14.672675,1,,,,1,82.89,,,,,,
+./audio_data\testing_data_audio\PIKARU8_20240723_164002.wav,122.85,123.15,TRUE,14.672675,1,,,,1,-82.89,,,,,,
 ./audio_data\testing_data_audio\CWS-NOR_YTHEMP-RUR-265140-S1_20210613_050000.mp3,170.25,170.55,TRUE,14.076274,1,,,,1,-87.72,,,,,,
 ./audio_data\testing_data_audio\PIKARU7_20240725_122002.wav,141.9,142.2,TRUE,13.684865,1,,,,4,-70.85,,,,,,
 ./audio_data\testing_data_audio\CWS-NOR_YTHEMP-RUR-276468-T3_20210623_083000.mp3,84.15,84.45,TRUE,12.859412,1,,,,5,-81.18,,,,,,
