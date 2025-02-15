@@ -7,6 +7,12 @@ library(dplyr)
 # Read the CSV file into a data.table
 human_predictions_dt <- fread(file.path("data","pika_activity","all_human_dataset.csv"))
 
+human_predictions_dt[,product:= as.character(round(end_time,2)) ]
+human_predictions_dt[,duplicate:= substr(product,nchar(product),nchar(product)) ]
+human_predictions_dt=human_predictions_dt[duplicate != "5"]
+
+human_predictions_dt[,product:= ((start_time+1 )*100 ) ==0 ]
+
 file_names_dt <- unique(human_predictions_dt[, .(file)])
 
 filtered_h_predictions <- human_predictions_dt[seq(1, .N, by = 2) & PIKA > 10]
@@ -44,12 +50,24 @@ humans_present_table$humans_present <- factor(humans_present_table$humans_presen
 humans_present_table$site <- factor(humans_present_table$site)
 
 human_model1 <- anovaBF( 
-  count ~ humans_present + (1|site),
+  count ~ humans_present,
   data = humans_present_table
 )
 
 human_model1
 
+
+human_model2 <- brm(count ~ humans_present + (1|site),
+                    data = humans_present_table,
+                    #family = poisson(),
+                    # prior = prior1,
+                    cores = 3,
+                    chains = 3,
+                    iter = 4000,
+                    warmup = 1500)
+
+
+summary(human_model2)
 # plot: what am I plotting? 
 # Calculate means and 95% confidence intervals for each group
 summary_data <- humans_present_table %>%

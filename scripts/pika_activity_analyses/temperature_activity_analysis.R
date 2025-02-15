@@ -54,7 +54,9 @@ weather_vs_calls <- merge(site_date_count, weather_data, by = c("site","date"), 
 # Test colinearity?
 
 # Set prior
-prior1 <-
+prior1 <- 0
+
+cor(weather_vs_calls[,c("max_temp","daily_rainfall","avg_wind_speed")],method = "spearman")
 
 ## Set up model with site as a random effect
 weather_model_1 <- brm(
@@ -63,13 +65,13 @@ weather_model_1 <- brm(
           avg_wind_speed + 
           (1 | site),
   weather_vs_calls,
-  #family = ,
+  family = poisson(),
   #prior = prior1,
   cores = 3,
   chains = 3,
   iter = 4000,
-  warmup = 1500
-  #control = 
+  warmup = 1500 ,
+  control = list(adapt_delta = 0.9)
   )
 
 ## look at the distribution of the parameters, look at effective sample size ESS
@@ -85,15 +87,24 @@ pp_check(weather_model_1)
 loo(weather_model_1)
 pp_check(weather_model_1)
 
+weather_vs_calls_pred = weather_vs_calls
+weather_vs_calls_pred$daily_rainfall = mean(weather_vs_calls_pred$daily_rainfall)
+weather_vs_calls_pred$avg_wind_speed = mean(weather_vs_calls_pred$avg_wind_speed)
 
 ## create a data frame of predictions of our model
-predictions <- add_predicted_draws(weather_vs_calls,
-                                   weather_model_1) 
+predictions <- add_epred_draws(weather_vs_calls_pred,
+                                   weather_model_1,re_formula = NA) 
+
+
+
+library(sjPlot)
+
+plot_model(weather_model_1,terms = "max_temp",type="pred")
 
 # Make plots
 ggplot(weather_vs_calls,aes(max_temp,count))+
-  stat_lineribbon(data = predictions,aes(y = .prediction),.width = c(0.2), alpha = 0.25)+ ## 95% credible interval
-  stat_lineribbon(data = predictions,aes(y = .prediction),.width = c(0), alpha = 1)+ ## mean
+  stat_lineribbon(data = predictions,aes(y = .epred),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
+  stat_lineribbon(data = predictions,aes(y = .epred),.width = c(0), alpha = 1)+ ## mean
   geom_point()+
   scale_color_viridis_d()+
   scale_fill_viridis_d()+
