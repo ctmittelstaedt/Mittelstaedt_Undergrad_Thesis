@@ -6,6 +6,8 @@ library(brms) # Bayesian model fitting
 library(data.table)
 library(sjPlot)
 
+# ****IGNORE the  data processing!!!!!! Jump to line 40
+
 # Convert extra weather days into .Rdata
 weather_extras <- fread(file.path("data","pika_activity","predict_score_weather_extras.csv"))
 saveRDS(weather_extras,file.path("recognizer_outputs","predict_score_weather_extras.RData"))
@@ -27,7 +29,15 @@ merged_data <- do.call(rbind, all_data)
 filtered_pikaru <- merged_data[grepl("PIKARU5|PIKARU10|PIKARU15|PIKARU25", file)]
 
 # Save filtered table
-saveRDS(filtered_pikaru, file = "recognizer_outputs/predictions/all_sites_weather_predictions.RDS")
+saveRDS(filtered_pikaru, file = "recognizer_outputs/predictions/all_sites_weather_predictions.RData")
+
+
+
+
+###### START HERE: ######################################
+
+# Call in .Rdata
+filtered_pikaru <- readRDS("recognizer_outputs/predictions/all_sites_weather_predictions.RData")
 
 # Remove overlap and set score threshold to 10
 binary_pikaru <- filtered_pikaru[seq(1, .N, by = 2) & PIKA > 10]

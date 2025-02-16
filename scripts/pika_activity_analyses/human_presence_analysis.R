@@ -4,6 +4,7 @@ library(tidyverse)
 library(dplyr)
 library(brms)
 
+#########IGNORE data processing!!!! Jump to line 46! ###############
 # Read the CSV file into a data.table
 human_predictions_dt <- fread(file.path("data","pika_activity","all_human_dataset.csv"))
 
@@ -37,6 +38,13 @@ head(new_table_full)
 # Add column for human presence
 humans_present_table <- new_table_full %>%
   mutate(humans_present = ifelse(date %in% c(20240808, 20240726, 20240718), "Y", "N"))
+
+saveRDS(humans_present_table, file = "data/pika_activity/full_human_dataset.RData")
+
+
+
+###########START HERE: ##########################
+humans_present_table <- readRDS("data/pika_activity/full_human_dataset.RData")
 
 ##########################BAYESIAN ANOVA#############################################
 
