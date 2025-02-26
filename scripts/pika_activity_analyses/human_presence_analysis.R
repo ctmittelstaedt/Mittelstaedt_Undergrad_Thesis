@@ -3,6 +3,7 @@ library(data.table)
 library(tidyverse)
 library(dplyr)
 library(brms)
+library(ggplot2)
 
 #########IGNORE data processing!!!! Jump to line 46! ###############
 # Read the CSV file into a data.table
@@ -52,14 +53,20 @@ humans_present_table <- readRDS("data/pika_activity/full_human_dataset.RData")
 humans_present_table$humans_present <- factor(humans_present_table$humans_present)
 humans_present_table$site <- factor(humans_present_table$site)
 
+# Set prior
+human_prior <- c(set_prior(prior = 'normal(0,1)', class='b', coef='humans_presentY'))	
+  
 # Model
 human_model2 <- brm(count ~ humans_present + (1|site),
                     data = humans_present_table,
-                    #family = poisson(),
+                    family = poisson(),
+                    prior = human_prior,
                     cores = 3,
                     chains = 3,
-                    iter = 4000,
-                    warmup = 1500)
+                    iter = 5000,
+                    warmup = 2000,
+                    control = list(adapt_delta = 0.99)
+                    )
 
 ## look at the distribution of the parameters, look at effective sample size ESS
 summary(human_model2)
@@ -70,6 +77,6 @@ plot(human_model2)
 ## plot a "goodness of fit" plot, compare your model distribution to the poster distribution of the data
 pp_check(human_model2)
 
-# Make plot with dots and whiskers
+# Make dots and whisker plot
 
 

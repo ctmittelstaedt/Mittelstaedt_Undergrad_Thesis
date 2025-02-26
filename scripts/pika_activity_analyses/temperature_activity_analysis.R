@@ -5,6 +5,8 @@ library(tidybayes) # easy retrieval of BRM prediction
 library(brms) # Bayesian model fitting
 library(data.table)
 library(sjPlot)
+library(gghalves)
+library(ggplot2)
 
 # ****IGNORE the  data processing!!!!!! Jump to line 40
 
@@ -63,15 +65,16 @@ weather_data$date <- as.character(weather_data$date)
 
 # Create final dataset
 weather_vs_calls <- merge(site_date_count, weather_data, by = c("site","date"), all.x = TRUE)
+weather_vs_calls$site <- factor(weather_vs_calls$site)
 
 
 ################################BAYESIAN MODEL############################################
 
 # Set priors - need to scale these down if using Poisson
-prior1 <- c(set_prior(prior = 'normal(10,8)', class='b', coef='max_temp'), 	
-            set_prior(prior = 'normal(0.5,5)', class='b', coef='daily_rainfall'),
-            set_prior(prior = 'normal(5,10)', class='b', coef='avg_wind_speed')
-            )  
+prior1 <- c(set_prior(prior = 'normal(0.25,5)', class='b', coef='max_temp'), 	
+            set_prior(prior = 'normal(-0.3,5)', class='b', coef='daily_rainfall'),
+            set_prior(prior = 'normal(-0.3,5)', class='b', coef='avg_wind_speed')
+            ) 
 
 # Test collinearity
 cor(weather_vs_calls[,c("max_temp","daily_rainfall","avg_wind_speed")])
@@ -83,13 +86,13 @@ weather_model_1 <- brm(
           avg_wind_speed + 
           (1 | site),
   weather_vs_calls,
-  #family = poisson(),
-  #prior = prior1,
+  family = poisson(),
+  prior = prior1,
   cores = 3,
   chains = 3,
-  iter = 4000,
-  warmup = 1500,
-  control = list(adapt_delta = 0.95) # To improve convergence
+  iter = 5000,
+  warmup = 2000,
+  control = list(adapt_delta = 0.99, max_treedepth = 15)
   )
 
 ## look at the distribution of the parameters, look at effective sample size ESS
@@ -143,7 +146,4 @@ ggplot(weather_vs_calls,aes(avg_wind_speed, count))+
   theme_bw()+
   labs(x= "Average wind speed (km/h)",y="Number of calls per day")
 
-## results: this may or may not happen
-
-class(weather_model_1)
 

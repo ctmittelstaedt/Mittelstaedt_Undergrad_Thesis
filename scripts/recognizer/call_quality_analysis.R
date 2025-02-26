@@ -3,6 +3,8 @@
 library(tidyverse)
 library(tidybayes)
 library(brms) 
+library(gghalves)
+install.packages("ggplot2")
 
 call_quality <- read_csv(file.path("data","recognizer","recognizer_call_quality_assessment.csv"))
 
@@ -13,8 +15,11 @@ pairs(~ predict_score + harmonics + power_density,
 # Double check
 cor(call_quality$harmonics,call_quality$power_density)
 
+# Set prior
+human_prior <- c(set_prior(prior = 'normal(4,8)', class='b', coef='harmonics'))	
+
 # Simple model - no power_density because collinearity issue
-quality_model_1  <- brm(predict_score ~ harmonics,
+quality_model_1  <- brm(predict_score ~ harmonics + log(harmonics),
                        call_quality,
                        cores = 3,
                        chains = 3,
@@ -34,11 +39,11 @@ pp_check(quality_model_1)
 ## create a data frame of predictions of our model
 predictions <- add_predicted_draws(call_quality,
                                    quality_model_1,
-                                   re_formula = predict_score ~ harmonics)
+                                   re_formula = predict_score ~ log(harmonics))
 
 
 # Plot number of harmonics vs score
-ggplot(call_quality,aes(harmonics,predict_score))+
+ggplot(call_quality,aes(log(harmonics),predict_score))+
   stat_lineribbon(data = predictions,aes(y = .prediction),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
   stat_lineribbon(data = predictions,aes(y = .prediction),.width = c(0), alpha = 1)+ ## mean
   geom_point()+
@@ -46,11 +51,6 @@ ggplot(call_quality,aes(harmonics,predict_score))+
   scale_fill_viridis_d()+
   theme_bw()+
   labs(x= "Number of harmonics",y="Prediction score")
-
-# If we had included power_density
-predictions <- add_epred_draws(call_quality,
-                                   quality_model_1,
-                                   re_formula = predict_score ~ power_density)
 
 
 ## results: this may or may not happen
