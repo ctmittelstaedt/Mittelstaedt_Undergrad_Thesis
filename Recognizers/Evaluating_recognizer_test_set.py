@@ -11,6 +11,7 @@ import pandas as pd
 from glob import glob
 import subprocess
 import os
+import sklearn.metrics
 
 
 #set up plotting
@@ -144,7 +145,7 @@ merged_df.rename(columns={'PIKA_file1': 'pika_present', 'PIKA_file2': 'predict_s
 # Step 4: Optionally, rename the 'Binary_Predictions' column from predictions to something more descriptive
 merged_df.rename(columns={'Binary_Predictions': 'binary_predictions'}, inplace=True)
 
-merged_df.to_csv('./All_annotations_copy/predictions_fully_merged.csv')
+merged_df.to_csv('./evaluating_test_set_histograms/predictions_fully_merged_CWS_and_our_data.csv')
 
 #######################
 # Generating evaluation metrics
@@ -187,7 +188,27 @@ print('recall:', recall)
 #mAP = average_precision_score(actual, score)
 #print('mAP:', mAP)
 
-# The average ROC AUC, precision-recall  AUC, average maximum F1 scores, optimal threshold values, and average precision  and recall scores associated with the optimal threshold are listed in Table 3.
+# Precision recall over threshold
+from sklearn.metrics import precision_recall_curve
+
+precisions, recalls, thresholds = sklearn.metrics.precision_recall_curve(y_true=actual, y_score=score, pos_label=1, sample_weight=None, drop_intermediate=False, probas_pred='deprecated')
+
+plt.plot(thresholds, precisions[:-1], label='Precision', color='#44AA99')  # We exclude the last threshold value
+plt.plot(thresholds, recalls[:-1], label='Recall', color='#882255')      # Same for recall, to match threshold length
+
+# Adding labels and title
+plt.xlabel('Threshold')
+plt.ylabel('Score')
+
+plt.gca().spines['top'].set_visible(False)
+plt.gca().spines['right'].set_visible(False)
+plt.gca().spines['left'].set_visible(True)
+plt.gca().spines['bottom'].set_visible(True)
+
+# Show legend and plot
+plt.legend(loc='best')
+plt.show()
+
 
 # Histogram for predictions
 fig, axs = plt.subplots(1,1, figsize = (10,20))
