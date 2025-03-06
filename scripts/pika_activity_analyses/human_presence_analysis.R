@@ -52,12 +52,16 @@ humans_present_table <- readRDS("data/pika_activity/full_human_dataset.RData")
 # Make categorical variables factors
 humans_present_table$humans_present <- factor(humans_present_table$humans_present)
 humans_present_table$site <- factor(humans_present_table$site)
+humans_present_table$date <- factor(humans_present_table$date)
+humans_present_table$time <- factor(humans_present_table$time)
 
 # Set prior
-human_prior <- c(set_prior(prior = 'normal(0,1)', class='b', coef='humans_presentY'))	
+human_prior <- c(set_prior(prior = 'normal(0,1)', class='b', coef='humans_presentY'),
+                 set_prior(prior = 'gamma(3,10)', class='Intercept', coef='', lb=0)
+                 )	
   
 # Model
-human_model2 <- brm(count ~ humans_present + (1|site),
+human_model2 <- brm(count ~ humans_present + (1|site) +(1|date)+(1|time),
                     data = humans_present_table,
                     family = poisson(),
                     prior = human_prior,
@@ -65,7 +69,7 @@ human_model2 <- brm(count ~ humans_present + (1|site),
                     chains = 3,
                     iter = 5000,
                     warmup = 2000,
-                    control = list(adapt_delta = 0.99)
+                    control = list(adapt_delta = 0.99, max_treedepth = 15)
                     )
 
 ## look at the distribution of the parameters, look at effective sample size ESS
@@ -76,6 +80,7 @@ fixef(human_model2)
 plot(human_model2)
 ## plot a "goodness of fit" plot, compare your model distribution to the poster distribution of the data
 pp_check(human_model2)
+
 
 # Make dots and whisker plot
 
