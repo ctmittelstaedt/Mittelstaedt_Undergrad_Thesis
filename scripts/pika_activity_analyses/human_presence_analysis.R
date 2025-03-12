@@ -13,14 +13,20 @@ human_predictions_dt <- fread(file.path("data","pika_activity","predict_score_fu
 file_names_dt <- unique(human_predictions_dt[, .(file)])
 
 # Remove clip overlap and set score threshold to 10
-filtered_h_predictions <- human_predictions_dt[seq(1, .N, by = 2) & PIKA > 10]
+unoverlap_h_predictions <- human_predictions_dt[!grepl("\\.\\d5$", end_time), ]
+filtered_h_predictions <- unoverlap_h_predictions[PIKA > 10]
+
+print(unique(filtered_h_predictions$file))
+print(table(processed_pikaru$ARU))
+print(unique(unoverlap_h_predictions$file))
+
 
 # Extract features from file name
 new_table <- filtered_h_predictions[, .(
   site = sub(".*/([^/]+)$", "\\1", dirname(file)),  # Extract the site (folder name) from the file path
-  date = sub(".*/[^/]+_(\\d{8})_(\\d{6})\\.wav", "\\1", file),  # Extract date from file name
-  time = sub(".*/[^/]+_(\\d{8})_(\\d{6})\\.wav", "\\2", file), # Extract time from file name
-  ARU = sub("([^/]+)_[^_]+_.+\\.wav", "\\1", basename(file)),  # Correct regex to extract ARU code
+  date = sub(".*/[^/]+_(\\d{8})_(\\d{6})\\.wav", "\\1", file),  
+  time = sub(".*/[^/]+_(\\d{8})_(\\d{6})\\.wav", "\\2", file), 
+  ARU = sub("([^/]+)_[^_]+_.+\\.wav", "\\1", basename(file)),  
   count = .N  # Count the number of times the file name appears
 ), by = file]
 
@@ -60,11 +66,11 @@ humans_present_table$ARU <- factor(humans_present_table$ARU)
 
 # Set prior
 human_prior <- c(set_prior(prior = 'normal(0,3)', class='b', coef='humans_presentY'),
-                 set_prior(prior = 'gamma(1,10)', class='Intercept', coef='', lb=0)
+                 set_prior(prior = 'normal(1,3)', class='Intercept', coef='')
                  )	
   
 # Model
-human_model2 <- brm(count ~ humans_present + (1|site) +(1|date)+(1|time)+(1|ARU),
+human_model2 <- brm(count ~ humans_present + (1|site) +(1|date)+(1|ARU),
                     data = humans_present_table,
                     family = poisson(),
                     prior = human_prior,
@@ -87,9 +93,10 @@ pp_check(human_model2)
 
 
 # Make dot and whisker plot
-# Generate posterior draws for the model's effects
-predictions <- add_epred_draws(humans_present_table, human_model2, re_formula = NULL)
+# Model predictions
+predictions <- add_epred_draws(humans_present_table, human_model2, re_formula = ~(1|site))
 
+# Site effect predictions
 site_preds <- predictions %>%
   group_by(site, humans_present) %>%
   summarize(
@@ -101,7 +108,7 @@ site_preds <- predictions %>%
 # Convert humans_present to numeric for positioning
 site_preds$humans_present_numeric <- as.numeric(site_preds$humans_present)
 
-# Prepare the fixed effect predictions
+# Fixed effect predictions
 pred_summary <- predictions %>%
   group_by(humans_present) %>%
   summarize(
@@ -115,16 +122,16 @@ site_colors <- brewer.pal(length(unique(site_preds$site)), "Set1")
 
 # Plot
 ggplot() +
-  # Add the fixed effect (mean) as a central point with whiskers
+  # Add the fixed effect as a central point with whiskers
   geom_point(data = pred_summary, aes(x = humans_present, y = mean_pred), colour = "black", size = 3) +
   geom_errorbar(data = pred_summary, aes(x = humans_present, ymin = lower, ymax = upper), width = 0.2, colour = "black") +
   
   # Add faint dots and whiskers for each site, spread symmetrically around the fixed effect
   geom_point(data = site_preds, aes(x = humans_present_numeric, y = site_mean, colour = site),
-              alpha = 0.3, size = 2, width = 0.2) +  # Jitter the site-specific predictions
+              alpha = 0.3, size = 2, width = 0.2,position = position_dodge(width = 0.4)) +  # Jitter the site-specific predictions
   
   geom_errorbar(data = site_preds, aes(x = humans_present_numeric, ymin = site_lower, ymax = site_upper, colour = site), 
-                width = 0.2, alpha = 0.3) +
+                width = 0.2, alpha = 0.3,position = position_dodge(width = 0.4)) +
   
   # Customize the theme and labels
   scale_color_manual(values = site_colors) +  # Apply unique colors to each site

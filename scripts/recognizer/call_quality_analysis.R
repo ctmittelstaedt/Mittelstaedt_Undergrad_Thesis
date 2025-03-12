@@ -17,11 +17,11 @@ cor(call_quality$harmonics,call_quality$power_density)
 
 # Set prior
 prior1 <- c(set_prior(prior = 'normal(4,6)', class='b', coef='harmonics'),
-            #set_prior(prior = 'normal(4,6)', class='b', coef='logharmonics'),
+            set_prior(prior = 'normal(0,6)', class='b', coef='logharmonics'),
                  set_prior(prior = 'normal(-13,6)', class='Intercept', coef=''))
 
 # Simple model - no power_density because collinearity issue
-quality_model_1  <- brm(predict_score ~ harmonics,#+log(harmonics),
+quality_model_1  <- brm(predict_score ~ harmonics+log(harmonics),
                        call_quality,
                        cores = 3,
                        chains = 3,
@@ -44,7 +44,7 @@ dummydt <- data.frame(harmonics = seq(from=0,to=9,length.out=20))
 predictions <- add_epred_draws(call_quality,
                               #dummydt,
                               quality_model_1,
-                              re_formula = predict_score ~ harmonics,  #+log(harmonics),
+                              re_formula = predict_score ~ harmonics + log(harmonics),
                               ndraws = 1000,
                               seed=1
                               )

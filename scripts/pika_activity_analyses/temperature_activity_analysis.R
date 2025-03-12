@@ -108,16 +108,16 @@ weather_vs_calls$site <- factor(weather_vs_calls$site)
 # Scale data to help with intercept prior estimate
 weather_vs_calls_scaled <- weather_vs_calls %>%
   mutate(
-    max_temp = scale(max_temp, center = TRUE, scale = FALSE),         # Standardize max_temp
-    daily_rainfall = scale(daily_rainfall, center = TRUE, scale = FALSE),  # Standardize daily_rainfall
-    avg_wind_speed = scale(avg_wind_speed, center = TRUE, scale = FALSE)   # Standardize avg_wind_speed
+    max_temp = scale(max_temp, center = TRUE, scale = FALSE)[,1],         
+    daily_rainfall = scale(daily_rainfall, center = TRUE, scale = FALSE)[,1],  
+    avg_wind_speed = scale(avg_wind_speed, center = TRUE, scale = FALSE)[,1]   
   )
 
 # Set priors - need to scale these down if using Poisson*make SD smaller from 5
-prior1 <- c(set_prior(prior = 'normal(0.25,2)', class='b', coef='max_temp'), 	
-            set_prior(prior = 'normal(-0.3,2)', class='b', coef='daily_rainfall'),
-            set_prior(prior = 'normal(-0.3,2)', class='b', coef='avg_wind_speed'),
-            set_prior(prior = 'gamma(5,2)', class='Intercept', coef='', lb=0)
+prior1 <- c(set_prior(prior = 'normal(0.12,1)', class='b', coef='max_temp'), 	
+            set_prior(prior = 'normal(-0.15,0.5)',class='b', coef='daily_rainfall'),
+            set_prior(prior = 'normal(-0.15,0.5)', class='b', coef='avg_wind_speed'),
+            set_prior(prior = 'normal(5.6,2)', class='Intercept', coef='', lb=0)
             )
 
 # Test collinearity
@@ -130,7 +130,7 @@ weather_model_1 <- brm(
           avg_wind_speed + 
           (1 | site) +
           (1 | date) + 
-          #(1|ARU),
+          (1|ARU),
   weather_vs_calls_scaled,
   family = poisson(),
   prior = prior1,
@@ -153,40 +153,46 @@ pp_check(weather_model_1)
 as_draws_df()
 
 # Set rainfall and wind speed as means to disentangle variables for plot 1 - temp
-weather_vs_calls_pred = weather_vs_calls
+weather_vs_calls_pred <- weather_vs_calls_scaled
 weather_vs_calls_pred$daily_rainfall = mean(weather_vs_calls_pred$daily_rainfall)
 weather_vs_calls_pred$avg_wind_speed = mean(weather_vs_calls_pred$avg_wind_speed)
 
+dummydt_temp <- data.frame(max_temp = seq(from=-8,to=8,length.out=50))
+
 ## Create a data frame of predictions from our model
 predictions <- add_epred_draws(weather_vs_calls_pred,
-                                   weather_model_1,re_formula = NULL) 
+                                   weather_model_1,re_formula = ~ (1|site)) 
 
 
-ggplot(weather_vs_calls,aes(max_temp,count))+
-  stat_lineribbon(data = predictions,aes(y = .epred),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
-  stat_lineribbon(data = predictions,aes(y = .epred),.width = c(0), alpha = 1)+ ## mean
-  geom_point()+
+ggplot(dummydt_temp,aes(max_temp,count))+
+  stat_lineribbon(data = predictions,aes(y = .epred,fill = site),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
+  stat_lineribbon(data = predictions,aes(y = .epred,color = site),.width = c(0), alpha = 1)+ ## mean
+  geom_point(aes(x = max_temp, y = count,color=site), data = weather_vs_calls_scaled)+
   scale_color_viridis_d()+
   scale_fill_viridis_d()+
+  scale_x_continuous()+
   theme_bw()+
-  labs(x= "Daily maximum temperature (C)",y="Number of calls per day")
+  labs(x= "Daily maximum temperature (C)",y="Number of calls per day")+
+  theme(legend.position = "none")
+  facet_wrap(~site)
 
 # Plot 2 - rainfall
-weather_vs_calls_pred2 = weather_vs_calls
+weather_vs_calls_pred2 = weather_vs_calls_scaled
 weather_vs_calls_pred2$max_temp = mean(weather_vs_calls_pred$max_temp)
 weather_vs_calls_pred2$avg_wind_speed = mean(weather_vs_calls_pred$avg_wind_speed)
 
 predictions <- add_epred_draws(weather_vs_calls_pred2,
-                               weather_model_1,re_formula = NULL) 
+                               weather_model_1,re_formula = NA) 
 
 ggplot(predictions, aes(x = daily_rainfall, y = .epred, color = site))+
   stat_lineribbon(data = predictions,aes(y = .epred),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
   stat_lineribbon(data = predictions,aes(y = .epred),.width = c(0), alpha = 1)+ ## mean
-  geom_point(data = weather_vs_calls, aes(x = max_temp, y = count), color = "black", alpha = 0.5) + 
+  geom_point(data = weather_vs_calls_scaled, aes(x = max_temp, y = count), color = "black", alpha = 0.5) + 
   scale_color_viridis_d()+
   scale_fill_viridis_d()+
   theme_bw()+
-  labs(x= "Daily rainfall (mm)",y="Number of calls per day")
+  labs(x= "Daily rainfall (mm)",y="Number of calls per day")+
+  theme(legend.position = "none")
 
 # Plot 3 - wind speed
 weather_vs_calls_pred3 = weather_vs_calls
@@ -204,5 +210,6 @@ ggplot(weather_vs_calls,aes(avg_wind_speed, count))+
   scale_fill_viridis_d()+
   theme_bw()+
   labs(x= "Average wind speed (km/h)",y="Number of calls per day")
+  theme(legend.position = "none")
 
 
