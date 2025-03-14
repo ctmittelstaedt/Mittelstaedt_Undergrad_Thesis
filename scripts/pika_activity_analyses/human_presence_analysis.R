@@ -4,6 +4,7 @@ library(tidyverse)
 library(dplyr)
 library(brms)
 library(ggplot2)
+library(viridis)
 
 #########IGNORE data processing!!!! Jump to line 46! ###############
 # Read the CSV file into a data.table
@@ -128,28 +129,33 @@ ggplot() +
   
   # Add faint dots and whiskers for each site, spread symmetrically around the fixed effect
   geom_point(data = site_preds, aes(x = humans_present_numeric, y = site_mean, colour = site),
-              alpha = 0.3, size = 2, width = 0.2,position = position_dodge(width = 0.4)) +  # Jitter the site-specific predictions
+              alpha = 0.35, size = 2, width = 0.2,position = position_dodge(width = 0.4)) +  # Jitter the site-specific predictions
   
   geom_errorbar(data = site_preds, aes(x = humans_present_numeric, ymin = site_lower, ymax = site_upper, colour = site), 
-                width = 0.2, alpha = 0.3,position = position_dodge(width = 0.4)) +
+                width = 0.2, alpha = 0.35,position = position_dodge(width = 0.4)) +
   
   # Customize the theme and labels
-  scale_color_manual(values = site_colors) +  # Apply unique colors to each site
+  scale_color_viridis_d() +  # Apply unique colors to each site
   scale_x_discrete(labels = c("N" = "No", "Y" = "Yes")) +
   theme_bw() + 
-  labs(x = "Humans present", y = "Number of calls") +
+  labs(x = "Humans present", y = "Number of calls per recording") +
   theme(
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
-    axis.title.x = element_text(size = 14, vjust = -1),
-    axis.title.y = element_text(size = 14, vjust = 3),
-    axis.text.x = element_text(size = 12),  # Make sure x-axis text is readable
+    axis.title.x = element_text(size = 20, vjust = -1, margin=margin(b=10)),
+    axis.title.y = element_text(size = 20, vjust = 3, margin=margin(l=10)),
+    axis.text.x = element_text(size = 16),
+    axis.text.y = element_text(size = 16),
     panel.border = element_blank(),         # Remove the border
     axis.line.x = element_line(size = 0.5),   # Keep the bottom axis line
     axis.line.y = element_line(size = 0.5),   # Keep the left axis line
     axis.ticks = element_line(size = 1),
-    legend.title = element_blank() 
+    legend.title = element_blank(),
+    legend.text = element_text(size=16)
   )
 
+#scale_color_manual(values = site_colors)
+
+ggsave("figures/humans_present.png", width = 8, height = 6, dpi = 300)
 
 

@@ -38,18 +38,17 @@ plot(quality_model_1)
 ## plot a "goodness of fit" plot, compare your model distribution to the poster distriubtion of the data
 pp_check(quality_model_1)
 
-dummydt <- data.frame(harmonics = seq(from=0,to=9,length.out=20))
+dummydt <- data.frame(harmonics = seq(from=1,to=9,length.out=30))
 
 ## create a data frame of predictions of our model
-predictions <- add_epred_draws(call_quality,
-                              #dummydt,
+predictions <- add_epred_draws(dummydt,
                               quality_model_1,
                               re_formula = predict_score ~ harmonics + log(harmonics),
                               ndraws = 1000,
                               seed=1
                               )
 
-ggridges
+
 # Plot number of harmonics vs score
 ggplot(call_quality, aes(harmonics, predict_score)) +
   stat_lineribbon(data = predictions, aes(y = .epred), .width = c(0.95), alpha = 0.25, fill = "#999933") +  # 95% credible interval
@@ -62,25 +61,15 @@ ggplot(call_quality, aes(harmonics, predict_score)) +
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
     legend.position = "none",
-    axis.title.x = element_text(size = 14, vjust = -1.5), 
-    axis.title.y = element_text(size = 14, vjust = 1.5),
-    axis.text.x = element_text(size = 12),
-    axis.text.y = element_text(size = 12),
+    axis.title.x = element_text(size = 17, vjust = -1.5, margin=margin(b=10)), 
+    axis.title.y = element_text(size = 17, vjust = 1.5, margin=margin(l=10)),
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14),
     panel.border = element_blank(), 
     axis.line = element_line(color = "black", size = 0.5)
   )
 
-#############################################
-
-# or could do this
-pred <- predict_response(
-  quality_model_1,
-  dummydt,
-  ci_level = 0.95,margin = "empirical",
-  )
-
-plot_model(quality_model_1,terms = "harmonics",type="pred")
-
+ggsave("figures/call_quality.png", width = 8, height = 6, dpi = 300)
 
 
 
