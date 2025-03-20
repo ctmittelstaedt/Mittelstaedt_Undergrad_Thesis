@@ -18,13 +18,13 @@ rdata_files <- list.files(rdata_folder, pattern = "*.RData", full.names = TRUE)
 print(rdata_files)
 
 # Device color mappings
-device_colors <- c("PIKARU1" = "deepskyblue", "PIKARU2" = "darksalmon", "PIKARU3" = "darkseagreen", 
-                   "PIKARU4" = "darkmagenta", "PIKARU5" = "goldenrod3", "PIKARU6" = "deepskyblue", 
-                   "PIKARU7" = "darksalmon", "PIKARU8" = "darkseagreen", "PIKARU9" = "darkmagenta", 
-                   "PIKARU10" = "goldenrod3", "PIKARU11" = "deepskyblue", "PIKARU12" = "darksalmon", 
-                   "PIKARU13" = "darkseagreen", "PIKARU14" = "darkmagenta", "PIKARU15" = "goldenrod3", 
-                   "PIKARU21" = "deepskyblue", "PIKARU22" = "darksalmon", "PIKARU23" = "darkseagreen", 
-                   "PIKARU24" = "darkmagenta", "PIKARU25" = "goldenrod3", "PIKARU20" = "goldenrod3")
+device_colors <- c("PIKARU1" = "#88CCEE", "PIKARU2" = "#CC6677", "PIKARU3" = "#44AA99", 
+                   "PIKARU4" = "#882255", "PIKARU5" = "#999933", "PIKARU6" = "#88CCEE", 
+                   "PIKARU7" = "#CC6677", "PIKARU8" = "#44AA99", "PIKARU9" = "#882255", 
+                   "PIKARU10" = "#999933", "PIKARU11" = "#88CCEE", "PIKARU12" = "#CC6677", 
+                   "PIKARU13" = "#44AA99", "PIKARU14" = "#882255", "PIKARU15" = "#999933", 
+                   "PIKARU21" = "#88CCEE", "PIKARU22" = "#CC6677", "PIKARU23" = "#44AA99", 
+                   "PIKARU24" = "#882255", "PIKARU25" = "#999933", "PIKARU20" = "#999933")
 
 site_y_limits <- list(
   "PC" = c(0, 90),
@@ -63,6 +63,9 @@ process_and_plot <- function(rdata_file, site_y_limits) {
     time = sub(".*_(\\d{6})\\.wav", "\\1", file),
     site = sub("predict_score_(\\w+)_.*", "\\1", basename(rdata_file))
   )]
+  
+  row_count_by_site <- filtered_predictions[, .N, by = site]
+  print(row_count_by_site)
   
   # Convert time to numeric
   filtered_predictions[, time := as.numeric(time)]
@@ -109,6 +112,7 @@ process_and_plot <- function(rdata_file, site_y_limits) {
   return(plot)
 }
 
+
 # Use purrr::map() to process each RDS and generate a list of plots
 plots <- map(rdata_files, ~process_and_plot(.x, site_y_limits))
 
@@ -122,7 +126,306 @@ plot_grid <- grid.arrange(
 # Optionally, view the first plot
 print(plots[[7]])
 
+ggsave("figures/activity_plots1.png", plot=plot_grid, width = 12, height =14 )
 
-ggsave("figures/activity_plots.png", plot=plot_grid, width = 12, height =14 )
+# Number of daylight vs nighttime calls
+# Pika Camp
+pc1 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_PC_18Jul2024.RData")
+pc2 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_PC_20240721.RData")
+pc3 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_PC_20240725.RData")
+
+# Day 1
+pc1 <- pc1[!grepl("\\.\\d5$", end_time)]
+pc1 <- pc1[PIKA > 10]
+
+pc1[, `:=`(
+  date = sub(".*_(\\d{8})_.*", "\\1", file),
+  time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+)]
+
+pc1[, time := as.numeric(time)] 
+
+# Night
+count <- pc1[ (time >= 5000 & time <= 35000), .N]
+count
+count/3 #per hour
+
+# Daylight
+count <- pc1[ (time >= 35000 & time <= 235959) | (time >= 0 & time <= 5000), .N]
+count
+count/21 #per hour
+
+# Day 2
+pc2 <- pc2[!grepl("\\.\\d5$", end_time)]
+pc2 <- pc2[PIKA > 10]
+
+pc2[, `:=`(
+  date = sub(".*_(\\d{8})_.*", "\\1", file),
+  time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+)]
+
+pc2[, time := as.numeric(time)] 
+
+# Night
+count <- pc2[ (time >= 4000 & time <= 40000), .N]
+count
+count/3.33 #per hour
+
+# Daylight
+count <- pc2[ (time >= 40000 & time <= 235959) | (time >= 0 & time <= 4000), .N]
+count
+count/20.66 #per hour
+
+# Day 3
+setDT(pc3)
+pc3 <- pc3[!grepl("\\.\\d5$", end_time)]
+pc3 <- pc3[PIKA > 10]
+
+pc3[, `:=`(
+  date = sub(".*_(\\d{8})_.*", "\\1", file),
+  time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+)]
+
+pc3[, time := as.numeric(time)] 
+
+# Night
+count <- pc3[ (time >= 2000 & time <= 42000), .N]
+count
+count/4 #per hour
+
+# Daylight
+count <- pc3[ (time >= 42000 & time <= 235959) | (time >= 0 & time <= 2000), .N]
+count
+count/20 #per hour
 
 
+(99.71+103.38+113.45)/3
+(45.33+63.66+35.75)/3
+
+# Printer's Pass
+pc1 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_PP_19Jul2025.RData")
+pc2 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_PP_20240721.RData")
+pc3 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_PP_20240724.RData")
+
+setDT(pc1)
+setDT(pc2)
+setDT(pc3)
+
+# Day 1
+pc1 <- pc1[!grepl("\\.\\d5$", end_time)]
+pc1 <- pc1[PIKA > 10]
+pc1 <- pc1[, file := gsub(" - Copy", "", file)]
+
+pc1[, `:=`(
+  date = sub(".*_(\\d{8})_.*", "\\1", file),
+  time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+)]
+
+pc1[, time := as.numeric(time)]
+
+# Night
+count <- pc1[ (time >= 5000 & time <= 35000), .N]
+count
+count/3 #per hour
+
+# Daylight
+count <- pc1[ (time >= 35000 & time <= 235959) | (time >= 0 & time <= 5000), .N]
+count
+count/21 #per hour
+
+# Day 2
+pc2 <- pc2[!grepl("\\.\\d5$", end_time)]
+pc2 <- pc2[PIKA > 10]
+pc2 <- pc2[, file := gsub(" - Copy", "", file)]
+
+pc2[, `:=`(
+  date = sub(".*_(\\d{8})_.*", "\\1", file),
+  time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+)]
+
+pc2[, time := as.numeric(time)] 
+
+# Night
+count <- pc2[ (time >= 4000 & time <= 40000), .N]
+count
+count/3.33 #per hour
+
+# Daylight
+count <- pc2[ (time >= 40000 & time <= 235959) | (time >= 0 & time <= 4000), .N]
+count
+count/20.66 #per hour
+
+# Day 3
+setDT(pc3)
+pc3 <- pc3[!grepl("\\.\\d5$", end_time)]
+pc3 <- pc3[PIKA > 10]
+
+pc3[, `:=`(
+  date = sub(".*_(\\d{8})_.*", "\\1", file),
+  time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+)]
+
+pc3[, time := as.numeric(time)] 
+
+# Night
+count <- pc3[ (time >= 3000 & time <= 41000), .N]
+count
+count/3.66 #per hour
+
+# Daylight
+count <- pc3[ (time >= 41000 & time <= 235959) | (time >= 0 & time <= 3000), .N]
+count
+count/20.33 #per hour
+
+(337+451.54+593.26)/3
+(37+79.27+125.68)/3
+
+#Mt. Decoeli
+pc1 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_MD_28Jul2024.RData")
+pc2 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_MD_31Jul2024.RData")
+pc3 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_MD_20240727.RData")
+
+setDT(pc1)
+setDT(pc2)
+setDT(pc3)
+
+# Day 1
+pc1 <- pc1[!grepl("\\.\\d5$", end_time)]
+pc1 <- pc1[PIKA > 10]
+
+pc1[, `:=`(
+  date = sub(".*_(\\d{8})_.*", "\\1", file),
+  time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+)]
+
+pc1[, time := as.numeric(time)] 
+
+# Night
+count <- pc1[ (time >= 1000 & time <= 43000), .N]
+count
+count/4.33 #per hour
+
+# Daylight
+count <- pc1[ (time >= 43000 & time <= 235959) | (time >= 0 & time <= 1000), .N]
+count
+count/19.66 #per hour
+
+# Day 2
+pc2 <- pc2[!grepl("\\.\\d5$", end_time)]
+pc2 <- pc2[PIKA > 10]
+
+pc2[, `:=`(
+  date = sub(".*_(\\d{8})_.*", "\\1", file),
+  time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+)]
+
+pc2[, time := as.numeric(time)]
+
+# Night
+count <- pc2[ (time >= 235000 & time <= 235959)|(time >= 0 & time <= 44000), .N]
+count
+count/4.83 #per hour
+
+# Daylight
+count <- pc2[ (time > 44000 & time <= 235000), .N]
+count
+count/19.17 #per hour
+
+# Day 3
+pc3 <- pc3[!grepl("\\.\\d5$", end_time)]
+pc3 <- pc3[PIKA > 10]
+
+pc3[, `:=`(
+  date = sub(".*_(\\d{8})_.*", "\\1", file),
+  time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+)]
+
+pc3[, time := as.numeric(time)] 
+
+# Night
+count <- pc3[ (time >= 1000 & time <= 43000), .N]
+count
+count/4.33 #per hour
+
+# Daylight
+count <- pc3[ (time >= 43000 & time <= 235959) | (time >= 0 & time <= 1000), .N]
+count
+count/19.66 #per hour
+
+(27.56+15.80+34.79)/3
+(3+44.92+90.06)/3
+
+#Mt. Boyle
+pc1 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_MB_09Aug2024.RData")
+pc2 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_MB_10Aug2024.RData")
+pc3 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_MB_12Aug2024.RData")
+
+setDT(pc1)
+setDT(pc2)
+setDT(pc3)
+
+# Day 1
+pc1 <- pc1[!grepl("\\.\\d5$", end_time)]
+pc1 <- pc1[PIKA > 10]
+
+pc1[, `:=`(
+  date = sub(".*_(\\d{8})_.*", "\\1", file),
+  time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+)]
+
+pc1[, time := as.numeric(time)] 
+
+# Night
+count <- pc1[ (time >= 1000 & time <= 43000), .N]
+count
+count/4.33 #per hour
+
+# Daylight
+count <- pc1[ (time >= 43000 & time <= 235959) | (time >= 0 & time <= 1000), .N]
+count
+count/19.66 #per hour
+
+# Day 2
+pc2 <- pc2[!grepl("\\.\\d5$", end_time)]
+pc2 <- pc2[PIKA > 10]
+
+pc2[, `:=`(
+  date = sub(".*_(\\d{8})_.*", "\\1", file),
+  time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+)]
+
+pc2[, time := as.numeric(time)]
+
+# Night
+count <- pc2[ (time > 0 & time < 44000), .N]
+count
+count/4.66 #per hour
+
+# Daylight
+count <- pc2[ (time > 44000 & time <= 235999), .N]
+count
+count/19.33 #per hour
+
+# Day 3
+pc3 <- pc3[!grepl("\\.\\d5$", end_time)]
+pc3 <- pc3[PIKA > 10]
+
+pc3[, `:=`(
+  date = sub(".*_(\\d{8})_.*", "\\1", file),
+  time = sub(".*_(\\d{6})\\.wav", "\\1", file)
+)]
+
+pc3[, time := as.numeric(time)] 
+
+# Night
+count <- pc3[ (time >= 235000 & time <= 235959) | (time >= 0 & time < 44000), .N]
+count
+count/4.83 #per hour
+
+# Daylight
+count <- pc3[ (time >= 44000 & time < 235000), .N]
+count
+count/19.17 #per hour
+
+(45.26+48.73+26.76)/3
+(157.96+59.44+15.52)/3
