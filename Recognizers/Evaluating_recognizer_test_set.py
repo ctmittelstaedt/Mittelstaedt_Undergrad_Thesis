@@ -12,66 +12,65 @@ from glob import glob
 import subprocess
 import os
 import sklearn.metrics
+import matplotlib
 
 
 #set up plotting
 from matplotlib import pyplot as plt
-plt.rcParams['figure.figsize']=[15,5] #for large visuals
+plt.rcParams['figure.figsize']=[8,6] #for large visuals
+plt.rcParams['font.family'] = 'Arial'
 
 #load model
-#model = load_model("./model_training_checkpoints/epoch-99.model")
+model = load_model("./model_training_checkpoints/epoch-99.model")
 #model = load_model("C:/Users/User/Desktop/best.model")
 
 ##################From recognizer code to create test set so that I can play around with it.
 # Make a list of all of the selection table files
-#raven_files = sorted(glob("./raven_data/*/*.txt"))
+raven_files = sorted(glob("./raven_data/testing_data_raven/*.txt"))
 
 # Create a list of audio files, one corresponding to each Raven file (Audio files have the same names as selection files with a different extension)
-#audio_files = sorted(glob("./audio_data/*/*.wav") + glob("./audio_data/*/*.mp3"))
+audio_files = sorted(glob("./audio_data/testing_data_audio/*.wav") + glob("./audio_data/testing_data_audio/*.mp3"))
 
 from opensoundscape.annotations import BoxedAnnotations
-# Create a dataframe of annotations
-#annotations = BoxedAnnotations.from_raven_files(
-    #raven_files, 
-    #"Annotation",
-    #audio_files, 
-    #keep_extra_columns=['Selection','View', 'Channel','Begin Time (s)', 'End Time (s)', 'Low Freq (Hz)', 'High Freq (Hz)','Annotation'])
+#Create a dataframe of annotations
+annotations = BoxedAnnotations.from_raven_files(
+    raven_files, 
+    "Annotation",
+    audio_files, 
+    keep_extra_columns=['Selection','View', 'Channel','Begin Time (s)', 'End Time (s)', 'Low Freq (Hz)', 'High Freq (Hz)','Annotation'])
 
 # Access the underlying DataFrame
-#annotations_data = annotations.df
-#annotations_data.to_csv("./All_annotations_copy/annotations_data.csv")
+annotations_data = annotations.df
+annotations_data.to_csv("./All_annotations_copy/Testing_OUR_data/annotations_data.csv")
 
 # Parameters to use for label creation*changed from 0.4 to 0.3
-#clip_duration = 0.3
-#clip_overlap = 0.0
-#min_label_overlap = 0.07
-#min_label_fraction = 0.8
-#species_of_interest = ["PIKA"] 
+clip_duration = 0.3
+clip_overlap = 0.0
+min_label_overlap = 0.07
+min_label_fraction = 0.8
+species_of_interest = ["PIKA"] 
 
 # Create dataframe of one-hot labels
-#clip_labels = annotations.clip_labels(
-    #clip_duration = clip_duration,
-    #clip_overlap = clip_overlap,
-    #min_label_overlap = min_label_overlap,
-    #min_label_fraction = min_label_fraction,
-    #class_subset = species_of_interest # You can comment this line out if you want to include all species.
-#)
+clip_labels = annotations.clip_labels(
+    clip_duration = clip_duration,
+    clip_overlap = clip_overlap,
+    min_label_overlap = min_label_overlap,
+    min_label_fraction = min_label_fraction,
+    class_subset = species_of_interest # You can comment this line out if you want to include all species.
+)
 
 # Access the underlying DataFrame
-#clip_labels.to_csv("./All_annotations_copy/clip_labels.csv")
+clip_labels.to_csv("./All_annotations_copy/Testing_OUR_data/clip_labels.csv")
 
 # Select all files from testing_data_raven as a test set
-#mask = clip_labels.reset_index()['file'].apply(lambda x: 'testing_data_audio' in x).values
-#test_set = clip_labels[mask]
-
-# All other files will be used as a training set
-#train_and_val_set = clip_labels.drop(test_set.index)
+mask = clip_labels.reset_index()['file'].apply(lambda x: 'testing_data_audio' in x).values
+test_set = clip_labels[mask]
 
 # Save .csv tables of the training and validation sets to keep a record of them
-#test_set.to_csv("./All_annotations_copy/test_set.csv")
+test_set.to_csv("./All_annotations_copy/Testing_OUR_data/test_set.csv")
 
 #load the table listing files in the test set 
-test_set = pd.read_csv('./All_annotations_copy/test_set.csv',index_col=[0,1,2])
+test_set = pd.read_csv('./All_annotations_copy/Testing_OUR_data/test_set.csv',index_col=[0,1,2])
 
 
 #####PREPROCESS
@@ -95,22 +94,19 @@ from opensoundscape.ml.dataloaders import SafeAudioDataloader
 from opensoundscape import Audio
 
 # subset the labels to only those the model was trained on
-#test_set = test_set[model.classes]
+test_set = test_set[model.classes]
 
 # run "inference": use the CNN to predict the presence of each class in the audio clips
-#predictions = model.predict(test_set,
-                            #clip_overlap = 0.15,
-                            #num_workers=0,
-                            #batch_size=1000
-#)
+predictions = model.predict(test_set,
+                            clip_overlap = 0.15,
+                            num_workers=0,
+                            batch_size=1000
+)
 
 # save predictions
-#predictions.to_csv('./All_annotations_copy/cnn_predictions_test_set.csv')
+predictions.to_csv('./All_annotations_copy/Testing_OUR_data/cnn_predictions_test_set.csv')
 
-predictions = pd.read_csv('./All_annotations_copy/cnn_predictions_test_set.csv',index_col=[0,1,2])
-
-
-#print(predictions.head())
+predictions = pd.read_csv('./All_annotations_copy/Testing_OUR_data/cnn_predictions_test_set.csv',index_col=[0,1,2])
 
 
 # Binarize
@@ -128,13 +124,13 @@ def binarize(x, threshold):
     return [1 if xi > threshold else 0 for xi in x]
 
 #try this for binary: opensoundscape.metrics.predict_multi_target_labels(scores, threshold)
-binary_predictions = pd.Series(binarize(predictions['PIKA'], threshold=5), index=predictions.index)
+binary_predictions = pd.Series(binarize(predictions['PIKA'], threshold=10), index=predictions.index)
 
 predictions['Binary_Predictions'] = binary_predictions
 
-predictions.to_csv('./All_annotations_copy/cnn_predictions_test_set_binarized.csv')
+predictions.to_csv('./All_annotations_copy/Testing_OUR_data/cnn_predictions_test_set_binarized.csv')
 
-predictions = pd.read_csv('./All_annotations_copy/cnn_predictions_test_set_binarized.csv',index_col=[0,1,2])
+predictions = pd.read_csv('./All_annotations_copy/Testing_OUR_data/cnn_predictions_test_set_binarized.csv',index_col=[0,1,2])
 
 # Step 2: Merge the DataFrames on the index
 merged_df = pd.merge(test_set, predictions, left_index=True, right_index=True, how='inner', suffixes=('_file1', '_file2'))
@@ -145,7 +141,7 @@ merged_df.rename(columns={'PIKA_file1': 'pika_present', 'PIKA_file2': 'predict_s
 # Step 4: Optionally, rename the 'Binary_Predictions' column from predictions to something more descriptive
 merged_df.rename(columns={'Binary_Predictions': 'binary_predictions'}, inplace=True)
 
-merged_df.to_csv('./evaluating_test_set_histograms/predictions_fully_merged_CWS_and_our_data.csv')
+merged_df.to_csv('./All_annotations_copy/Testing_OUR_data/predictions_fully_merged.csv')
 
 #######################
 # Generating evaluation metrics
@@ -153,7 +149,7 @@ from sklearn import metrics
 
 # Define 'actual' as the 'pika_present' column, converting TRUE/FALSE to 1/0
 # Assuming TRUE is represented as `True` and FALSE as `False` in the 'pika_present' column
-df = pd.read_csv('./All_annotations_copy/predictions_fully_merged.csv')
+df = pd.read_csv('./All_annotations_copy/Testing_OUR_data/predictions_fully_merged.csv')
 
 actual = df['pika_present'].astype(int)
 
@@ -163,13 +159,29 @@ predicted = df['binary_predictions']
 # Define 'score' as the 'predict_score' column
 score = df['predict_score']
 
+import cmocean
+print(matplotlib.__version__)
+
 confusion_matrix = metrics.confusion_matrix(actual, predicted)
 
 import matplotlib.pyplot as plt
 import numpy as np
+import cmcrameri.cm as cmc
 
-cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = ['absent', 'present'])
-cm_display.plot()
+cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = ['No pika', 'Pika'])
+cm_display.plot(cmap='cmc.batlow')
+for label in cm_display.ax_.texts:  # 'texts' contains the numbers in the matrix
+    label.set_fontsize(16)
+for label in cm_display.ax_.get_xticklabels():
+    label.set_fontsize(16)  # Adjust font size
+for label in cm_display.ax_.get_yticklabels():
+    label.set_fontsize(16)  
+cbar = cm_display.im_.colorbar  # Access colorbar from the im_ attribute
+
+# Now adjust font size of the colorbar ticks
+cbar.ax.tick_params(labelsize=16)
+plt.xlabel('Predicted label', fontsize=21, labelpad=10)  # Adjust fontsize and labelpad for X-axis
+plt.ylabel('True label', fontsize=21, labelpad=10)
 plt.show()
 
 
@@ -193,35 +205,66 @@ from sklearn.metrics import precision_recall_curve
 
 precisions, recalls, thresholds = sklearn.metrics.precision_recall_curve(y_true=actual, y_score=score, pos_label=1, sample_weight=None, drop_intermediate=False, probas_pred='deprecated')
 
-plt.plot(thresholds, precisions[:-1], label='Precision', color='#44AA99')  # We exclude the last threshold value
-plt.plot(thresholds, recalls[:-1], label='Recall', color='#882255')      # Same for recall, to match threshold length
+plt.plot(thresholds, precisions[:-1], label='Precision', color='#ee9e72', linewidth=4)  # We exclude the last threshold value
+plt.plot(thresholds, recalls[:-1], label='Recall', color='#2f6260', linewidth=4)      # Same for recall, to match threshold length
 
-# Adding labels and title
-plt.xlabel('Threshold')
-plt.ylabel('Score')
+plt.xlabel('Threshold', fontsize=21, labelpad=10)
+plt.ylabel('Score', fontsize=21, labelpad=10)
+plt.tick_params(axis='both', which='major', labelsize=16)
 
 plt.gca().spines['top'].set_visible(False)
 plt.gca().spines['right'].set_visible(False)
 plt.gca().spines['left'].set_visible(True)
 plt.gca().spines['bottom'].set_visible(True)
+plt.gca().spines['left'].set_linewidth(2) 
+plt.gca().spines['bottom'].set_linewidth(2)
 
-# Show legend and plot
-plt.legend(loc='best')
+plt.legend(loc='best', frameon=False, fontsize=16)
 plt.show()
+
+# Plot without threshold
+plt.plot(recalls, precisions, label='Precision-Recall Curve', color='#1a3f60', linewidth=4)
+
+plt.xlabel('Recall', fontsize=21, labelpad=10)
+plt.ylabel('Precision', fontsize=21, labelpad=10)
+plt.tick_params(axis='both', which='major', labelsize=16)
+
+plt.gca().spines['top'].set_visible(False)
+plt.gca().spines['right'].set_visible(False)
+plt.gca().spines['left'].set_linewidth(2) 
+plt.gca().spines['bottom'].set_linewidth(2)
+
+plt.show()
+
+# AUC score
+from sklearn.metrics import auc
+
+# Calculate AUC (area under the curve)
+auc_pr = auc(recalls, precisions)  # Exclude last precision value to match lengths
+print(f'Area Under Precision-Recall Curve (AUC-PR): {auc_pr}')
 
 
 # Histogram for predictions
-fig, axs = plt.subplots(1,1, figsize = (10,20))
+fig, axs = plt.subplots(1,1)
 axs = np.ravel(axs)
 for ax, species in enumerate(model.classes):
     positives = test_set[species] == 1
     negatives = test_set[species] == 0
-    axs[ax].hist(predictions[positives][species], alpha=0.5, color="red", label="Positives")
-    axs[ax].hist(predictions[negatives][species], alpha=0.5, color="blue", label="Negatives")
+    axs[ax].hist(predictions[positives][species], alpha=0.5, color="#ee9e72", label="Positives")
+    axs[ax].hist(predictions[negatives][species], alpha=0.5, color="#2f6260", label="Negatives")
     axs[ax].set_yscale("log")
-    axs[ax].set_ylabel("Number of audio segments")
-    axs[ax].set_xlabel("Score")
-    axs[ax].legend()
+    axs[ax].set_ylabel("Number of audio clips", fontsize = 21, labelpad=10)
+    axs[ax].set_xlabel("Prediction score", fontsize = 21, labelpad=10)
+    axs[ax].legend(frameon=False, fontsize = 16)
+    axs[ax].tick_params(axis='y', which='minor', left=False)
+    axs[ax].tick_params(axis='x', labelsize=16)  # For x-axis
+    axs[ax].tick_params(axis='y', labelsize=16)
 
-plt.tight_layout(pad=9.0)
+
+plt.gca().spines['top'].set_visible(False)
+plt.gca().spines['right'].set_visible(False)
+plt.gca().spines['left'].set_visible(True)
+plt.gca().spines['bottom'].set_visible(True)
+plt.gca().spines['left'].set_linewidth(2) 
+plt.gca().spines['bottom'].set_linewidth(2)
 plt.show()
