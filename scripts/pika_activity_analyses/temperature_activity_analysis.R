@@ -8,7 +8,6 @@ library(sjPlot)
 library(gghalves)
 library(ggplot2)
 library(gridExtra)
-install.packages("patchwork")
 library(patchwork)
 
 # ****IGNORE the  data processing!!!!!! Jump to line 40
@@ -144,6 +143,10 @@ weather_model_1 <- brm(
   control = list(adapt_delta = 0.999, max_treedepth = 20)
   )
 
+saveRDS(weather_model_1, "weather_model_1.rds")
+
+weather_model_1 <- readRDS("weather_model_1.rds")
+
 ## look at the distribution of the parameters, look at effective sample size ESS
 summary(weather_model_1)
 ## summary of the fixed effects
@@ -155,11 +158,26 @@ plot(weather_model_1)
 pp_check(weather_model_1)
 as_draws_df()
 
+#Set colours
+site_weather_colours <- c(
+  "PC"="#e59e62",
+  "PP"="#b8901e",
+  "MD"="#336061",
+  "MB"="#547349"
+)
+
+overall_colour <- "#0e1b5e"
+
 # Set rainfall and wind speed as means to disentangle variables for plot 1 - temp
 weather_vs_calls_pred <- weather_vs_calls_scaled
 weather_vs_calls_pred$daily_rainfall = mean(weather_vs_calls_pred$daily_rainfall)
 weather_vs_calls_pred$avg_wind_speed = mean(weather_vs_calls_pred$avg_wind_speed)
 
+# Calculate meaninful effect sizes (slopes)
+# Temp
+exp(5.84 + 0.06 + (-0.002631234)*(mean(weather_vs_calls_pred$daily_rainfall))+(0.09)*(mean(weather_vs_calls_pred$avg_wind_speed))) - exp(5.84 + (-0.002631234)*(mean(weather_vs_calls_pred$daily_rainfall))+(0.09)*(mean(weather_vs_calls_pred$avg_wind_speed)))
+# Wind
+exp(5.84 + 0.09 + (-0.002631234)*(mean(weather_vs_calls_pred$daily_rainfall))+(0.06)*(mean(weather_vs_calls_pred$max_temp))) - exp(5.84 + (-0.002631234)*(mean(weather_vs_calls_pred$daily_rainfall)) + (0.06)*(mean(weather_vs_calls_pred$max_temp)))
 
 ## Create a data frame of predictions from our model
 predictions <- add_epred_draws(weather_vs_calls_pred,
@@ -173,8 +191,8 @@ plot1 <- ggplot(predictions,aes(uncentered_max_temp,count))+
   stat_lineribbon(data = predictions,aes(y = .epred,fill = site),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
   stat_lineribbon(data = predictions,aes(y = .epred,color = site),.width = c(0), alpha = 1)+ ## mean
   geom_point(aes(x = uncentered_max_temp, y = count,color=site), data = weather_vs_calls_scaled)+
-  scale_color_viridis_d()+
-  scale_fill_viridis_d()+
+  scale_color_manual(values = site_colors) +  # Custom colors for points and lines
+  scale_fill_manual(values = site_colors) + 
   scale_x_continuous(
       # Define the range of the x-axis
     #breaks = seq(6, 21, by = 3),  # Adjust the breaks as needed
@@ -190,16 +208,23 @@ plot1 <- ggplot(predictions,aes(uncentered_max_temp,count))+
     axis.line.y = element_line(size = 0.5),    # Keep left axis line
     axis.ticks = element_line(size = 1),       # Keep axis ticks
     axis.ticks.length = unit(0.2, "cm"),       # Set tick length
-    axis.text.x = element_text(size = 12),     # X axis text size
-    axis.text.y = element_text(size = 12),
-    axis.title.x = element_text(size = 15, vjust = -2, margin=margin(b=10)),
-    axis.title.y = element_text(size = 15, vjust = 4, margin=margin(l=10)),
+    axis.text.x = element_text(size = 15),     # X axis text size
+    axis.text.y = element_text(size = 15),
+    axis.title.x = element_text(size = 20, vjust = -2, margin=margin(b=10)),
+    axis.title.y = element_text(size = 20, vjust = 4, margin=margin(l=10)),
     panel.border = element_blank(),            # Remove panel border
     legend.title = element_blank(),            # Remove legend title
     legend.key = element_blank(),
-    legend.text = element_text(size=12)
+    legend.text = element_text(size=15)
         )+
-  guides(fill = "none", color = "legend")
+  #guides(
+    #fill = "none", 
+    #color = guide_legend(override.aes = list(fill = "transparent", color = site_colors))  # Explicitly set color legend with no background
+  guides(
+    fill = "none",  # Remove the fill legend
+    color = "none"  # Remove the color legend as well
+  )
+  
 
 plot1
 
@@ -212,11 +237,9 @@ weather_vs_calls_scaled$uncentered_max_temp <- weather_vs_calls_scaled$max_temp 
 
 
 plot2 <- ggplot(predictions2,aes(uncentered_max_temp,count))+
-  stat_lineribbon(data = predictions2,aes(y = .epred),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
-  stat_lineribbon(data = predictions2,aes(y = .epred),.width = c(0), alpha = 1)+ ## mean
-  geom_point(aes(x = uncentered_max_temp, y = count), data = weather_vs_calls_scaled)+
-  scale_color_viridis_d()+
-  scale_fill_viridis_d()+
+  stat_lineribbon(data = predictions2,aes(y = .epred),.width = c(0.95), alpha = 0.25, colour = "#0e1b5e")+ ## 95% credible interval
+  stat_lineribbon(data = predictions2,aes(y = .epred),.width = c(0), alpha = 1, colour = "#0e1b5e")+ ## mean
+  geom_point(aes(x = uncentered_max_temp, y = count), colour = "#0e1b5e", data = weather_vs_calls_scaled)+
   scale_x_continuous(
     #breaks = seq(6, 21, by = 3),  # Adjust the breaks as needed
     labels = scales::label_number() 
@@ -231,14 +254,14 @@ plot2 <- ggplot(predictions2,aes(uncentered_max_temp,count))+
     axis.line.y = element_line(size = 0.5),    # Keep left axis line
     axis.ticks = element_line(size = 1),       # Keep axis ticks
     axis.ticks.length = unit(0.2, "cm"),       # Set tick length
-    axis.text.x = element_text(size = 12),     # X axis text size
-    axis.text.y = element_text(size = 12),
-    axis.title.x = element_text(size = 15, vjust = -2, margin=margin(b=10)),
-    axis.title.y = element_text(size = 15, vjust = 4, margin=margin(l=10)),
+    axis.text.x = element_text(size = 15),     # X axis text size
+    axis.text.y = element_text(size = 15),
+    axis.title.x = element_text(size = 20, vjust = -2, margin=margin(b=10)),
+    axis.title.y = element_text(size = 20, vjust = 4, margin=margin(l=10)),
     panel.border = element_blank(),            # Remove panel border
     legend.title = element_blank(),            # Remove legend title
     legend.key = element_blank(),
-    legend.text = element_text(size=12)
+    legend.text = element_text(size=15)
   )+
   guides(fill = "none", color = "legend")
 
@@ -260,8 +283,8 @@ plot3 <- ggplot(predictions3,aes(uncentered_rain,count))+
   stat_lineribbon(data = predictions3,aes(y = .epred,fill = site),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
   stat_lineribbon(data = predictions3,aes(y = .epred,color = site),.width = c(0), alpha = 1)+ ## mean
   geom_point(aes(x = uncentered_rain, y = count,color=site), data = weather_vs_calls_scaled)+
-  scale_color_viridis_d()+
-  scale_fill_viridis_d()+
+  scale_color_manual(values = site_colors) +  # Custom colors for points and lines
+  scale_fill_manual(values = site_colors) + 
   scale_x_continuous(
     labels = scales::label_number() 
   )+
@@ -275,16 +298,21 @@ plot3 <- ggplot(predictions3,aes(uncentered_rain,count))+
     axis.line.y = element_line(size = 0.5),    # Keep left axis line
     axis.ticks = element_line(size = 1),       # Keep axis ticks
     axis.ticks.length = unit(0.2, "cm"),       # Set tick length
-    axis.text.x = element_text(size = 12),     # X axis text size
-    axis.text.y = element_text(size = 12),
-    axis.title.x = element_text(size = 15, vjust = -2, margin=margin(b=10)),
-    axis.title.y = element_text(size = 15, vjust = 4, margin=margin(l=10)),
+    axis.text.x = element_text(size = 15),     # X axis text size
+    axis.text.y = element_text(size = 15),
+    axis.title.x = element_text(size = 20, vjust = -2, margin=margin(b=10)),
+    axis.title.y = element_text(size = 20, vjust = 4, margin=margin(l=10)),
     panel.border = element_blank(),            # Remove panel border
     legend.title = element_blank(),            # Remove legend title
     legend.key = element_blank(),
-    legend.text = element_text(size=12)
+    legend.text = element_text(size=15),
+    legend.background = element_blank(),
+    legend.box.background = element_blank()
   )+
-  guides(fill = "none", color = "legend")
+  guides(
+    fill = "none",  # Remove the fill legend
+    color = "none"  # Remove the color legend as well
+  )
 
 plot3
 
@@ -297,9 +325,9 @@ weather_vs_calls_scaled$uncentered_rain <- weather_vs_calls_scaled$daily_rainfal
 
 
 plot4 <- ggplot(predictions4,aes(uncentered_rain,count))+
-  stat_lineribbon(data = predictions4,aes(y = .epred),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
-  stat_lineribbon(data = predictions4,aes(y = .epred),.width = c(0), alpha = 1)+ ## mean
-  geom_point(aes(x = uncentered_rain, y = count), data = weather_vs_calls_scaled)+
+  stat_lineribbon(data = predictions4,aes(y = .epred),.width = c(0.95), alpha = 0.25, colour = "#0e1b5e")+ ## 95% credible interval
+  stat_lineribbon(data = predictions4,aes(y = .epred),.width = c(0), alpha = 1, colour = "#0e1b5e")+ ## mean
+  geom_point(aes(x = uncentered_rain, y = count), data = weather_vs_calls_scaled, colour = "#0e1b5e")+
   scale_color_viridis_d()+
   scale_fill_viridis_d()+
   scale_x_continuous(
@@ -315,14 +343,14 @@ plot4 <- ggplot(predictions4,aes(uncentered_rain,count))+
     axis.line.y = element_line(size = 0.5),    # Keep left axis line
     axis.ticks = element_line(size = 1),       # Keep axis ticks
     axis.ticks.length = unit(0.2, "cm"),       # Set tick length
-    axis.text.x = element_text(size = 12),     # X axis text size
-    axis.text.y = element_text(size = 12),
-    axis.title.x = element_text(size = 15, vjust = -2, margin=margin(b=10)),
-    axis.title.y = element_text(size = 15, vjust = 4, margin=margin(l=10)),
+    axis.text.x = element_text(size = 15),     # X axis text size
+    axis.text.y = element_text(size = 15),
+    axis.title.x = element_text(size = 20, vjust = -2, margin=margin(b=10)),
+    axis.title.y = element_text(size = 20, vjust = 4, margin=margin(l=10)),
     panel.border = element_blank(),            # Remove panel border
     legend.title = element_blank(),            # Remove legend title
     legend.key = element_blank(),
-    legend.text = element_text(size=12)
+    legend.text = element_text(size=15)
   ) + guides(fill = "none", color = "legend")
 
 plot4
@@ -343,8 +371,8 @@ plot5 <- ggplot(predictions5,aes(uncentered_wind,count))+
   stat_lineribbon(data = predictions5,aes(y = .epred,fill = site),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
   stat_lineribbon(data = predictions5,aes(y = .epred,color = site),.width = c(0), alpha = 1)+ ## mean
   geom_point(aes(x = uncentered_wind, y = count,color=site), data = weather_vs_calls_scaled)+
-  scale_color_viridis_d()+
-  scale_fill_viridis_d()+
+  scale_color_manual(values = site_colors) +  # Custom colors for points and lines
+  scale_fill_manual(values = site_colors) + 
   scale_x_continuous(
     labels = scales::label_number() 
   )+
@@ -358,16 +386,19 @@ plot5 <- ggplot(predictions5,aes(uncentered_wind,count))+
     axis.line.y = element_line(size = 0.5),    # Keep left axis line
     axis.ticks = element_line(size = 1),       # Keep axis ticks
     axis.ticks.length = unit(0.2, "cm"),       # Set tick length
-    axis.text.x = element_text(size = 12),     # X axis text size
-    axis.text.y = element_text(size = 12),
-    axis.title.x = element_text(size = 15, vjust = -2, margin=margin(b=10)),
-    axis.title.y = element_text(size = 15, vjust = 4, margin=margin(l=10)),
+    axis.text.x = element_text(size = 15),     # X axis text size
+    axis.text.y = element_text(size = 15),
+    axis.title.x = element_text(size = 20, vjust = -2, margin=margin(b=10)),
+    axis.title.y = element_text(size = 20, vjust = 4, margin=margin(l=10)),
     panel.border = element_blank(),            # Remove panel border
     legend.title = element_blank(),            # Remove legend title
     legend.key = element_blank(),
-    legend.text = element_text(size=12)
+    legend.text = element_text(size=15)
   )+
-  guides(fill = "none", color = "legend")
+  guides(
+    fill = "none",  # Remove the fill legend
+    color = "none"  # Remove the color legend as well
+  )
 
 plot5
 
@@ -380,9 +411,9 @@ weather_vs_calls_scaled$uncentered_wind <- weather_vs_calls_scaled$avg_wind_spee
 
 
 plot6 <- ggplot(predictions6,aes(uncentered_wind,count))+
-  stat_lineribbon(data = predictions6,aes(y = .epred),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
-  stat_lineribbon(data = predictions6,aes(y = .epred),.width = c(0), alpha = 1)+ ## mean
-  geom_point(aes(x = uncentered_wind, y = count), data = weather_vs_calls_scaled)+
+  stat_lineribbon(data = predictions6,aes(y = .epred),.width = c(0.95), alpha = 0.25, colour = "#0e1b5e")+ ## 95% credible interval
+  stat_lineribbon(data = predictions6,aes(y = .epred),.width = c(0), alpha = 1, colour = "#0e1b5e")+ ## mean
+  geom_point(aes(x = uncentered_wind, y = count), data = weather_vs_calls_scaled, colour = "#0e1b5e")+
   scale_color_viridis_d()+
   scale_fill_viridis_d()+
   scale_x_continuous(
@@ -398,22 +429,24 @@ plot6 <- ggplot(predictions6,aes(uncentered_wind,count))+
     axis.line.y = element_line(size = 0.5),    # Keep left axis line
     axis.ticks = element_line(size = 1),       # Keep axis ticks
     axis.ticks.length = unit(0.2, "cm"),       # Set tick length
-    axis.text.x = element_text(size = 12),     # X axis text size
-    axis.text.y = element_text(size = 12),
-    axis.title.x = element_text(size = 15, vjust = -2, margin=margin(b=10)),
-    axis.title.y = element_text(size = 15, vjust = 4, margin=margin(l=10)),
+    axis.text.x = element_text(size = 15),     # X axis text size
+    axis.text.y = element_text(size = 15),
+    axis.title.x = element_text(size = 20, vjust = -2, margin=margin(b=10)),
+    axis.title.y = element_text(size = 20, vjust = 4, margin=margin(l=10)),
     panel.border = element_blank(),            # Remove panel border
     legend.title = element_blank(),            # Remove legend title
     legend.key = element_blank(),
-    legend.text = element_text(size=12)
+    legend.text = element_text(size=15)
   ) + guides(fill = "none", color = "legend")
 
 plot6
 
-big_weather_plot <- (plot2 + plot1) / (plot4 + plot3) / (plot6 + plot5)
+big_weather_plot <- (plot2) / (plot4) / (plot6)
+
+big_weather_plot <- (plot1) / (plot3) / (plot5)
 
 big_weather_plot + 
   plot_layout(guides = "collect") +  # Collect all legends into one
-  theme(legend.position = "bottom")
+  theme(legend.position = "none")
 
-ggsave("figures/final_weather_plot.png", plot = big_weather_plot, width = 15, height = 18, dpi = 300)
+ggsave("figures/final_weather_plot2.png", plot = big_weather_plot, width = 7.5, height = 18, dpi = 300)

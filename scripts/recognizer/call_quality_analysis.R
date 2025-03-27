@@ -29,6 +29,10 @@ quality_model_1  <- brm(predict_score ~ harmonics+log(harmonics),
                        iter = 5000,
                        warmup = 2000)
 
+saveRDS(quality_model_1, "quality_model_1.rds")
+
+quality_model_1 <- readRDS("quality_model_1.rds")
+
 ## look at the distribution of the parameters, look at effective sample size ESS
 summary(quality_model_1)
 ## summary of the fixed effects
@@ -51,9 +55,9 @@ predictions <- add_epred_draws(dummydt,
 
 # Plot number of harmonics vs score
 ggplot(call_quality, aes(harmonics, predict_score)) +
-  stat_lineribbon(data = predictions, aes(y = .epred), .width = c(0.95), alpha = 0.25, fill = "#999933") +  # 95% credible interval
-  stat_lineribbon(data = predictions, aes(y = .epred), .width = c(0), alpha = 1, color = "#999933") +  # Mean prediction
-  geom_point(color = "#999933", size = 2.5, shape=16) +  # Adjust point size and shape
+  stat_lineribbon(data = predictions, aes(y = .epred), .width = c(0.95), alpha = 0.25, fill = "#1a3f60") +  # 95% credible interval
+  stat_lineribbon(data = predictions, aes(y = .epred), .width = c(0), alpha = 1, color = "#1a3f60") +  # Mean prediction
+  geom_point(color = "#1a3f60", size = 2.5, shape=16) +  # Adjust point size and shape
   theme_bw() +  # Use a clean theme
   labs(x = "Number of harmonics", y = "Prediction score") +
   scale_x_continuous(breaks = seq(0, 9, 1), labels = seq(0, 9, 1)) +  # Ensure x-axis has integer values

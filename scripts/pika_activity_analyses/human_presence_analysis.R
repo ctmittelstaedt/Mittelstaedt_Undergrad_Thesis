@@ -82,6 +82,10 @@ human_model2 <- brm(count ~ humans_present + (1|site) +(1|date)+(1|ARU),
                     control = list(adapt_delta = 0.9999, max_treedepth = 15)
                     )
 
+saveRDS(human_model2, "human_model2.rds")
+
+human_model2 <- readRDS("human_model2.rds")
+
 ## look at the distribution of the parameters, look at effective sample size ESS
 summary(human_model2)
 ## summary of the fixed effects
@@ -92,11 +96,13 @@ plot(human_model2)
 ## plot a "goodness of fit" plot, compare your model distribution to the poster distribution of the data
 pp_check(human_model2)
 
-
 # Make dot and whisker plot
 # Model predictions
 predictions <- add_epred_draws(humans_present_table, human_model2, re_formula = ~(1|site))
 
+# could also use predict_response
+
+print(predictions)
 # Site effect predictions
 site_preds <- predictions %>%
   group_by(site, humans_present) %>%
@@ -106,6 +112,7 @@ site_preds <- predictions %>%
     site_upper = quantile(.epred, probs = 0.975)
   )
 
+view(site_preds)
 # Convert humans_present to numeric for positioning
 site_preds$humans_present_numeric <- as.numeric(site_preds$humans_present)
 
@@ -118,14 +125,24 @@ pred_summary <- predictions %>%
     upper = quantile(.epred, probs = 0.975)
   )
 
+view(pred_summary)
+
 # Set up the color palette for sites
-site_colors <- brewer.pal(length(unique(site_preds$site)), "Set1")
+
+site_colors <- c(
+  "PC"="#e59e62",
+  "PP"="#b8901e",
+  "MD"="#336061",
+  "MB"="#547349"
+)
+
+
 
 # Plot
 ggplot() +
   # Add the fixed effect as a central point with whiskers
-  geom_point(data = pred_summary, aes(x = humans_present, y = mean_pred), colour = "black", size = 3) +
-  geom_errorbar(data = pred_summary, aes(x = humans_present, ymin = lower, ymax = upper), width = 0.2, colour = "black") +
+  geom_point(data = pred_summary, aes(x = humans_present, y = mean_pred), colour = "#0e1b5e", size = 3) +
+  geom_errorbar(data = pred_summary, aes(x = humans_present, ymin = lower, ymax = upper), width = 0.2, colour = "#0e1b5e") +
   
   # Add faint dots and whiskers for each site, spread symmetrically around the fixed effect
   geom_point(data = site_preds, aes(x = humans_present_numeric, y = site_mean, colour = site),
@@ -135,7 +152,7 @@ ggplot() +
                 width = 0.2, alpha = 0.35,position = position_dodge(width = 0.4)) +
   
   # Customize the theme and labels
-  scale_color_viridis_d() +  # Apply unique colors to each site
+  scale_color_manual(values = site_colors) +  # Apply unique colors to each site
   scale_x_discrete(labels = c("N" = "No", "Y" = "Yes")) +
   theme_bw() + 
   labs(x = "Humans present", y = "Number of calls per recording") +
@@ -154,7 +171,6 @@ ggplot() +
     legend.text = element_text(size=16)
   )
 
-#scale_color_manual(values = site_colors)
 
 ggsave("figures/humans_present.png", width = 8, height = 6, dpi = 300)
 

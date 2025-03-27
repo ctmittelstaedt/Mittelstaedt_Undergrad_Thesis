@@ -12,6 +12,17 @@ library(grid)
 ##################################################################################
 # Use the following code
 
+predictions <- read.csv("C:/PythonGitHub/Mittelstaedt_Undergrad_Thesis/Recognizers/Predict/predict_score_BC_7Aug2024_ARU16-19.csv")
+
+
+saveRDS(predictions,file.path("recognizer_outputs/predictions_diurnal_activity/predict_score_BC_07Aug2024.Rdata"))
+
+bc1 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_BC_07Aug2024.RData")
+bc2 <- readRDS("recognizer_outputs/predictions/predict_score_BC_PIKARU20_07Aug2024.RData")
+merged_bc <- rbind(bc1, bc2)
+saveRDS(merged_bc, file.path("recognizer_outputs/predictions_diurnal_activity/predict_score_BC_07Aug2024.Rata"))
+
+###################################
 rdata_folder <- "recognizer_outputs/predictions_diurnal_activity"
 rdata_files <- list.files(rdata_folder, pattern = "*.RData", full.names = TRUE)
 
@@ -23,18 +34,23 @@ device_colors <- c("PIKARU1" = "#88CCEE", "PIKARU2" = "#CC6677", "PIKARU3" = "#4
                    "PIKARU7" = "#CC6677", "PIKARU8" = "#44AA99", "PIKARU9" = "#882255", 
                    "PIKARU10" = "#999933", "PIKARU11" = "#88CCEE", "PIKARU12" = "#CC6677", 
                    "PIKARU13" = "#44AA99", "PIKARU14" = "#882255", "PIKARU15" = "#999933", 
+                   "PIKARU16" = "#88CCEE", "PIKARU17" = "#CC6677", "PIKARU18" = "#44AA99",
+                   "PIKARU19" = "#882255", "PIKARU20" = "#999933", 
                    "PIKARU21" = "#88CCEE", "PIKARU22" = "#CC6677", "PIKARU23" = "#44AA99", 
                    "PIKARU24" = "#882255", "PIKARU25" = "#999933", "PIKARU20" = "#999933")
 
 site_y_limits <- list(
-  "PC" = c(0, 90),
+  "PC" = c(0, 100),
   "PP" = c(0, 330),
   "MD" = c(0, 125),
-  "MB" = c(0, 125)
+  "MB" = c(0, 125),
+  "BC" = c(0, 100)
 )
 
+sun_times <- read.csv("C:/PythonGitHub/Mittelstaedt_Undergrad_Thesis/data/pika_activity/sunrise_sunset_summer2024.csv")
+
 # Function to process and plot each RDS file (now using readRDS)
-process_and_plot <- function(rdata_file, site_y_limits) {
+process_and_plot <- function(rdata_file, site_y_limits, sun_times) {
   # Load the RDS file
   predictions_dt <- readRDS(rdata_file)  # This loads the RDS object from the file
   
@@ -84,19 +100,35 @@ process_and_plot <- function(rdata_file, site_y_limits) {
   # Set y-axis limits based on the site
   y_limits <- site_y_limits[[site]]
   
+  unique_dates <- unique(filtered_predictions$date)
+  
+  ## Get sunrise/sunset times
+  sunrise_time <- sapply(unique_dates, function(date) {
+    sun_times[sun_times$site == site & sun_times$date == date, "sunrise"]
+  })
+  sunset_time <- sapply(unique_dates, function(date) {
+    sun_times[sun_times$site == site & sun_times$date == date, "sunset"]
+  })
+  
+  # Ensure that the sunrise and sunset times are correctly matched to the dates
+  if (length(sunrise_time) != 1 || length(sunset_time) != 1) {
+    stop("Unable to find sunrise and sunset times for the site and date combination.")
+  }
+  
   # Create a plot of time vs #pika calls for each day at each site
   plot <- ggplot(summary_table_hourly, aes(x = hour, y = count, color = device)) +
     geom_point(size=0.2) +
     geom_line(linewidth=1) +
+    
     labs(
-      title = paste(sub("predict_score_(\\w+)_.*", "\\1", basename(rdata_file))),  
+      #title = paste(sub("predict_score_(\\w+)_.*", "\\1", basename(rdata_file))),  
       x = "Hour of day",
       y = "Number of calls per hour"
     ) +
     theme_minimal() +
     theme(panel.grid = element_blank(),
           axis.line = element_line(color = "black", linewidth = 0.8),
-          axis.text = element_text(size = 12),  # Increase axis text size
+          axis.text = element_text(size = 15),  # Increase axis text size
           legend.position = "none",
           axis.title.x = element_blank(),  # Remove x-axis title for individual plots
           axis.title.y = element_blank()) +
@@ -104,9 +136,29 @@ process_and_plot <- function(rdata_file, site_y_limits) {
     guides(color = guide_legend(title = NULL)) +  # Remove legend title
     ylim(y_limits) +
     scale_x_continuous(
-      breaks = seq(0, 24, by = 4),  # Set the breaks at each hour
-      labels = function(x) sprintf("%02d:00", x)  # Format the x-axis labels as HH:00
-    )
+      breaks = seq(0, 24, by = 6),  # Set the breaks at each hour
+      labels = function(x) sprintf("%02d:00", x), # Format the x-axis labels as HH:00
+      limits = c(0,24),
+      expand = c(0, 0)
+      )
+  
+ ####################
+  if (sunset_time > 23) {
+    # Shading the part between sunset and 24:00, and between 0:00 and sunrise
+    plot <- plot + 
+      geom_rect(data = data.frame(xmin = sunset_time, xmax = 24),
+                aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
+                fill = "grey", alpha = 0.3, inherit.aes = FALSE) +
+      geom_rect(data = data.frame(xmin = 0, xmax = sunrise_time),
+                aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
+                fill = "grey", alpha = 0.3, inherit.aes = FALSE)
+  } else {
+    # Shading the part between sunset and sunrise (normal case)
+    plot <- plot + 
+      geom_rect(data = data.frame(xmin = sunset_time, xmax = sunrise_time),
+                aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
+                fill = "grey", alpha = 0.3, inherit.aes = FALSE)
+  }
     
   # Return the plot
   return(plot)
@@ -114,19 +166,43 @@ process_and_plot <- function(rdata_file, site_y_limits) {
 
 
 # Use purrr::map() to process each RDS and generate a list of plots
-plots <- map(rdata_files, ~process_and_plot(.x, site_y_limits))
+plots <- map(rdata_files, ~process_and_plot(.x, site_y_limits, sun_times))
+
+plots_to_plot <- plots[8:10]
+
+plots_to_plot_with_margin <- lapply(plots_to_plot, function(p) {
+  p + theme(plot.margin = margin(t = 10, r = 22, b = 5, l = 7))  # t: top, r: right, b: bottom, l: left
+})
+
+
+adjusted_plots <- lapply(plots, function(p) {
+  p + theme(
+    plot.margin = unit(c(1, 0.8, 1.4, 0.5), "cm")  # Add 1 cm padding to all sides (top, right, bottom, left)
+  )
+})
+
+modified_plots <- c(adjusted_plots[8],adjusted_plots[9],adjusted_plots[10],adjusted_plots[11],adjusted_plots[12],adjusted_plots[13],adjusted_plots[5],adjusted_plots[6],adjusted_plots[7],adjusted_plots[2],adjusted_plots[3],adjusted_plots[4],adjusted_plots[1])
 
 plot_grid <- grid.arrange(
-  grobs = plots,       # List of plots
+  grobs = modified_plots,       # List of plots
   ncol = 3,            # Arrange in 3 columns
-  left = textGrob("Number of calls per hour", rot = 90, gp = gpar(fontsize = 14)),  # y-axis label
-  bottom = textGrob("Hour of day", gp = gpar(fontsize = 14))  # x-axis label
+  #left = textGrob("Number of calls\nper hour", rot = 90, gp = gpar(fontsize = 18)),  # y-axis label
+  #bottom = textGrob("Hour of day", gp = gpar(fontsize = 18)),
+  padding = unit(1, "cm")  # Equal heights for rows (adjust as needed)
 )
 
-# Optionally, view the first plot
-print(plots[[7]])
 
-ggsave("figures/activity_plots1.png", plot=plot_grid, width = 12, height =14 )
+# Optionally, view the first plot
+print(plots[[1]])
+
+ggsave("figures/activity_plots_all.png", plot=plot_grid, width = 12, height =15)
+
+
+
+
+
+
+
 
 # Number of daylight vs nighttime calls
 # Pika Camp
@@ -429,3 +505,7 @@ count/19.17 #per hour
 
 (45.26+48.73+26.76)/3
 (157.96+59.44+15.52)/3
+
+
+(105+460+26+40)/4
+(48+80+46+77)/4
