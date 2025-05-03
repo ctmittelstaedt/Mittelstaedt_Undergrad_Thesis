@@ -1,13 +1,19 @@
-# Human presence vs pika activity
+##################################################################################
+# Bayesian model of human presence vs pika activity
+# Charlotte Mittelstaedt - The University of British Columbia
+# Created 9 February 2025
+##################################################################################
+
 library(data.table)
 library(tidyverse)
 library(dplyr)
 library(brms)
 library(ggplot2)
 library(viridis)
+library(tidybayes)
 
-#########IGNORE data processing!!!! Jump to line 46! ###############
-# Read the CSV file into a data.table
+## Data processing
+# Read prediction score CSV file into a data.table
 human_predictions_dt <- fread(file.path("data","pika_activity","predict_score_full_human_dataset.csv"))
 
 # Get unique file names
@@ -20,7 +26,6 @@ filtered_h_predictions <- unoverlap_h_predictions[PIKA > 10]
 print(unique(filtered_h_predictions$file))
 print(table(processed_pikaru$ARU))
 print(unique(unoverlap_h_predictions$file))
-
 
 # Extract features from file name
 new_table <- filtered_h_predictions[, .(
@@ -49,14 +54,11 @@ head(new_table_full)
 humans_present_table <- new_table_full %>%
   mutate(humans_present = ifelse(date %in% c(20240808, 20240726, 20240718), "Y", "N"))
 
+# Save processed file
 saveRDS(humans_present_table, file = "data/pika_activity/full_human_dataset.RData")
 
-
-
-###########START HERE: ##########################
+# Read in processed file
 humans_present_table <- readRDS("data/pika_activity/full_human_dataset.RData")
-
-##########################BAYESIAN ANOVA#############################################
 
 # Make categorical variables factors
 humans_present_table$humans_present <- factor(humans_present_table$humans_present)
@@ -65,7 +67,7 @@ humans_present_table$date <- factor(humans_present_table$date)
 humans_present_table$time <- factor(humans_present_table$time)
 humans_present_table$ARU <- factor(humans_present_table$ARU)
 
-# Set prior
+# Set priors
 human_prior <- c(set_prior(prior = 'normal(0,3)', class='b', coef='humans_presentY'),
                  set_prior(prior = 'normal(1,3)', class='Intercept', coef='')
                  )	
@@ -82,27 +84,30 @@ human_model2 <- brm(count ~ humans_present + (1|site) +(1|date)+(1|ARU),
                     control = list(adapt_delta = 0.9999, max_treedepth = 15)
                     )
 
+# Save model
 saveRDS(human_model2, "human_model2.rds")
 
+# Read in model
 human_model2 <- readRDS("human_model2.rds")
 
-## look at the distribution of the parameters, look at effective sample size ESS
+# Look at the distribution of the parameters, look at effective sample size ESS
 summary(human_model2)
-## summary of the fixed effects
+# Summary of the fixed effects
 fixef(human_model2)
+# Random effects
 ranef(human_model2)
-## trace the plots to check convergence
+# Trace plots to check convergence
 plot(human_model2)
-## plot a "goodness of fit" plot, compare your model distribution to the poster distribution of the data
+# Goodness of fit plot, compare model distribution to the poster distribution of the data
 pp_check(human_model2)
 
 # Make dot and whisker plot
+
 # Model predictions
 predictions <- add_epred_draws(humans_present_table, human_model2, re_formula = ~(1|site))
 
-# could also use predict_response
-
 print(predictions)
+
 # Site effect predictions
 site_preds <- predictions %>%
   group_by(site, humans_present) %>%
@@ -113,6 +118,7 @@ site_preds <- predictions %>%
   )
 
 view(site_preds)
+
 # Convert humans_present to numeric for positioning
 site_preds$humans_present_numeric <- as.numeric(site_preds$humans_present)
 
@@ -128,7 +134,6 @@ pred_summary <- predictions %>%
 view(pred_summary)
 
 # Set up the color palette for sites
-
 site_colors <- c(
   "PC"="#e59e62",
   "PP"="#b8901e",
@@ -136,23 +141,20 @@ site_colors <- c(
   "MB"="#547349"
 )
 
-
-
-# Plot
+# Make dot and whisker plot
 ggplot() +
   # Add the fixed effect as a central point with whiskers
   geom_point(data = pred_summary, aes(x = humans_present, y = mean_pred), colour = "#0e1b5e", size = 3) +
   geom_errorbar(data = pred_summary, aes(x = humans_present, ymin = lower, ymax = upper), width = 0.2, colour = "#0e1b5e") +
   
-  # Add faint dots and whiskers for each site, spread symmetrically around the fixed effect
+  # Add faint dots and whiskers for each site
   geom_point(data = site_preds, aes(x = humans_present_numeric, y = site_mean, colour = site),
-              alpha = 0.35, size = 2, width = 0.2,position = position_dodge(width = 0.4)) +  # Jitter the site-specific predictions
+              alpha = 0.55, size = 2, width = 0.2,position = position_dodge(width = 0.4)) +  # Jitter the site-specific predictions
   
   geom_errorbar(data = site_preds, aes(x = humans_present_numeric, ymin = site_lower, ymax = site_upper, colour = site), 
-                width = 0.2, alpha = 0.35,position = position_dodge(width = 0.4)) +
+                width = 0.2, alpha = 0.55,position = position_dodge(width = 0.4)) +
   
-  # Customize the theme and labels
-  scale_color_manual(values = site_colors) +  # Apply unique colors to each site
+  scale_color_manual(values = site_colors) +  
   scale_x_discrete(labels = c("N" = "No", "Y" = "Yes")) +
   theme_bw() + 
   labs(x = "Humans present", y = "Number of calls per recording") +
@@ -160,18 +162,18 @@ ggplot() +
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
     axis.title.x = element_text(size = 20, vjust = -1, margin=margin(b=10)),
-    axis.title.y = element_text(size = 20, vjust = 3, margin=margin(l=10)),
-    axis.text.x = element_text(size = 16),
-    axis.text.y = element_text(size = 16),
-    panel.border = element_blank(),         # Remove the border
-    axis.line.x = element_line(size = 0.5),   # Keep the bottom axis line
-    axis.line.y = element_line(size = 0.5),   # Keep the left axis line
+    axis.title.y = element_text(size = 20, vjust = 4.5, margin=margin(l=10)),
+    axis.text.x = element_text(size = 16, margin = margin(t = 5)),
+    axis.text.y = element_text(size = 16, margin = margin(r = 5)),
+    panel.border = element_blank(),        
+    axis.line.x = element_line(size = 0.5),   
+    axis.line.y = element_line(size = 0.5),   
     axis.ticks = element_line(size = 1),
     legend.title = element_blank(),
     legend.text = element_text(size=16)
   )
 
-
+# Save plot
 ggsave("figures/humans_present.png", width = 8, height = 6, dpi = 300)
 
 

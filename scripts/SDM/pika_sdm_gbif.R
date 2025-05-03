@@ -1,210 +1,186 @@
-#Pika SDM
+##################################################################################
+# Simple collared pika species distribution model
+# Charlotte Mittelstaedt - The University of British Columbia
+# Code adapted from Jordan Seider
+# Created 10 April 2025
+##################################################################################
 
-library(terra)
-library(geodata)
-library(predicts)
+library(sf)           # for spatial data
+library(terra)        # for raster data
+library(geodata)      # for geospatial data
+library(rgbif)        # for biodiversity data
+library(dplyr)        # for data manipulation
+library(randomForest) # for machine learning SDM
+
+# Define study area
+study_area <- ext(-170.773407, -120.045898, 55, 73)
 
 # Download climate data
-bioclim_data <- worldclim_global(var = "bio",
-                                 res = 2.5,
-                                 path = "data/SDM")
+climate_global <- worldclim_global(var = "bio", res = 0.5, path = "data/SDM")
+climate_yukon <- crop(climate_global, study_area, mask = TRUE)
 
-# Read in pika observations
-obs_data <- read.csv(file = "data/SDM/GBIF/pika_occurrence_GBIF.csv")
+## BIO1  = Annual Mean Temperature
+## BIO2  = Mean Diurnal Range (Mean of monthly (max temp - min temp))
+## BIO3  = Isothermality (BIO2/BIO7) (×100)
+## BIO4  = Temperature Seasonality (standard deviation ×100)
+## BIO5  = Max Temperature of Warmest Month
+## BIO6  = Min Temperature of Coldest Month
+## BIO7  = Temperature Annual Range (BIO5-BIO6)
+## BIO8  = Mean Temperature of Wettest Quarter
+## BIO9  = Mean Temperature of Driest Quarter
+## BIO10 = Mean Temperature of Warmest Quarter
+## BIO11 = Mean Temperature of Coldest Quarter
+## BIO12 = Annual Precipitation
+## BIO13 = Precipitation of Wettest Month
+## BIO14 = Precipitation of Driest Month
+## BIO15 = Precipitation Seasonality (Coefficient of Variation)
+## BIO16 = Precipitation of Wettest Quarter
+## BIO17 = Precipitation of Driest Quarter
+## BIO18 = Precipitation of Warmest Quarter
+## BIO19 = Precipitation of Coldest Quarter
 
-# Check the data to make sure it loaded correctly
-summary(obs_data)
+# Rename the bioclimatic variables
+names(climate_yukon) <- sub("wc2.1_30s_", "", names(climate_yukon))
 
-# Notice NAs - drop them before proceeding
-obs_data <- obs_data[!is.na(obs_data$decimalLongitude), ]
+# Plot the bioclimatic variable
+plot(climate_yukon)  # Annual Mean Temperature
+plot(climate_yukon[[2]]) # Mean Temperature of Warmest Quarter
 
-# Make sure those NA's went away
-summary(obs_data)
+# Let's create our own BIO7 raster
+maxTemp <- climate_yukon[[5]]
+minTemp <- climate_yukon[[6]]
+annual_range_YT <- maxTemp - minTemp
 
-# Determine geographic extent of our data
-max_lat <- 70
-min_lat <- 57.5
-max_lon <- -122
-min_lon <- -160
+plot(climate_yukon[[7]])
+plot(annual_range_YT)
 
+# Load elevation data
+elev_global <- elevation_global(res = 0.5, path = "data/SDM")
+elevation <- crop(elev_global, study_area, mask = TRUE)
 
-geographic_extent <- ext(x = c(min_lon, max_lon, min_lat, max_lat))
+plot(st_geometry(study_area))  # Study area plot
+plot(climate_yukon[[1]])
+plot(elevation)
+plot(st_geometry(study_area), add = TRUE, border = "red")
+ext(climate)
+ext(study_area)
 
-# Download data with geodata's world function to use for our base map
-world_map <- world(resolution = 3,
-                   path = "data/SDM")
+# Create stack of predictor variables
+predictors <- c(climate_yukon, elevation)
 
-# Crop the map to our area of interest
-my_map <- crop(x = world_map, y = geographic_extent)
+# Load the GBIF data
+pika <- occ_search(scientificName = "Ochotona collaris", # Scientific name
+                   hasCoordinate  = TRUE                 # Only records with coordinates
+)$data %>% # Extract the data only
+  
+  # Convert to sf object
+  st_as_sf(coords = c("decimalLongitude", "decimalLatitude"),
+           crs = "EPSG:4326") # WGS84
 
-# Plot the base map
-plot(my_map,
-     axes = T, 
-     col = "grey95")
+# Extract the geometry to simplify data
+pika_sf <- st_geometry(pika) 
+pika_sf
 
-# Add the points for individual observations
-points(x = obs_data$decimalLongitude, 
-       y = obs_data$decimalLatitude, 
-       col = "olivedrab", 
-       pch = 20, 
-       cex = 0.75)
+# Number of occurrences
+length(pika_sf)
 
-# Make an extent that is 25% larger
-sample_extent <- geographic_extent * 1.25
+# Clip occurrences to Yukon
+study_area <- ext(study_area)
 
-# Crop bioclim data to desired extent
-bioclim_data <- crop(x = bioclim_data, y = sample_extent)
+xmin <- study_area[1]
+xmax <- study_area[2]
+ymin <- study_area[3]
+ymax <- study_area[4]
 
-# Plot the first of the bioclim variables to check on cropping
-plot(bioclim_data[[1]])
+study_area <- st_sfc(st_polygon(list(matrix(c(xmin, ymin,
+                                              xmax, ymin,
+                                              xmax, ymax,
+                                              xmin, ymax,
+                                              xmin, ymin), 
+                                            ncol = 2, byrow = TRUE))))
 
-# Set the seed for the random-number generator to ensure results are similar
-set.seed(20210707)
+study_area <- st_as_sf(study_area)
+st_crs(study_area) <- 4326
 
-# Randomly sample points (same number as our observed points)
-background <- spatSample(x = bioclim_data,
-                         size = 882,    # generate 882 pseudo-absence points
-                         values = FALSE, # don't need values
-                         na.rm = TRUE,   # don't sample from ocean
-                         xy = TRUE)      # just need coordinates
+pika_yukon <- st_intersection(pika_sf, study_area)
 
-# Look at first few rows of background
-head(background)
+# Number of occurrences in study area
+length(pika_yukon)
 
-# Plot the base map
-plot(my_map,
-     axes = TRUE, 
-     col = "grey95")
-
-# Add the background points
-points(background,
-       col = "grey30",
-       pch = 1,
-       cex = 0.75)
-
-# Add the points for individual observations
-points(x = obs_data$decimalLongitude, 
-       y = obs_data$decimalLatitude, 
-       col = "olivedrab", 
-       pch = 20, 
-       cex = 0.75)
-
-# Pull out coordinate columns, x (longitude) first, then y (latitude) from 
-# saguaro data
-presence <- obs_data[, c("decimalLongitude", "decimalLatitude")]
-# Add column indicating presence
-presence$pa <- 1
-
-# Convert background data to a data frame
-absence <- as.data.frame(background)
-# Update column names so they match presence points
-colnames(absence) <- c("decimalLongitude", "decimalLatitude")
-# Add column indicating absence
-absence$pa <- 0
-
-# Join data into single data frame
-all_points <- rbind(presence, absence)
-
-# Reality check on data
-head(all_points)
-
-bioclim_extract <- extract(x = bioclim_data,
-                           y = all_points[, c("decimalLongitude", "decimalLatitude")],
-                           ID = FALSE) # No need for an ID column
-
-# Add the point and climate datasets together
-points_climate <- cbind(all_points, bioclim_extract)
-
-# Identify columns that are latitude & longitude
-drop_cols <- which(colnames(points_climate) %in% c("decimalLongitude", "decimalLatitude"))
-drop_cols # print the values as a reality check
-
-# Remove the geographic coordinates from the data frame
-points_climate <- points_climate[, -drop_cols]
-
-# Create vector indicating fold
-fold <- folds(x = points_climate,
-              k = 5,
-              by = points_climate$pa)
-
-table(fold)
-
-testing <- points_climate[fold == 1, ]
-training <- points_climate[fold != 1, ]
-
-# Build a model using training data
-glm_model <- glm(pa ~ ., data = training, family = binomial())
-
-# Get predicted values from the model
-glm_predict <- predict(bioclim_data, glm_model, type = "response")
-
-# Print predicted values
-plot(glm_predict)
-
-# Use testing data for model evaluation
-glm_eval <- pa_evaluate(p = testing[testing$pa == 1, ],
-                        a = testing[testing$pa == 0, ],
-                        model = glm_model,
-                        type = "response")
-
-# Determine minimum threshold for "presence"
-glm_threshold <- glm_eval@thresholds$max_spec_sens
-
-# Plot base map
-plot(my_map, 
-     axes = TRUE, 
-     col = "grey95")
-
-# Only plot areas where probability of occurrence is greater than the threshold
-plot(glm_predict > glm_threshold, 
+# Plot the occurrences
+plot(climate_yukon[[1]])
+plot(pika_yukon, 
      add = TRUE, 
-     legend = FALSE, 
-     col = "olivedrab")
+     pch = 20, 
+     col = "black")
 
-# And add those observations
-points(x = obs_data$longitude, 
-       y = obs_data$latitude, 
-       col = "black",
-       pch = "+", 
-       cex = 0.75)
+# Extract the predictor variables at the occurrence points
+pika_data <- terra::extract(predictors, vect(pika_yukon)) %>% # extract predictor raster value at each point
+  mutate(response = 1) %>%                                    # add response variable for presence/absence
+  select(response, everything(), -ID)                         # remove ID column and rearrange (response first; not necessary though)
 
-# Redraw those country borders
-plot(my_map, add = TRUE, axes = T, border = "grey5")
+# Create background dataset
+set.seed(1) # Set seed for reproducibility
 
-glm_predict > glm_threshold
+background <- st_sample(x    = study_area,                  # Study area (bound from which to select random points)
+                        size = length(pika_yukon) * 5) # Number of points; 5 times the number of occurrences
+plot(background)
 
-# Plot base map
-plot(my_map, 
-     axes = T, 
-     col = "white")
+# Extract the predictors variables at the background points
+background <- terra::extract(predictors, vect(background)) %>%
+  mutate(response = 0) %>%
+  select(response, everything(), -ID)
 
-# Only plot areas where probability of occurrence is greater than the threshold
-plot(glm_predict > glm_threshold, 
-     add = TRUE, 
-     legend = FALSE, 
-     col = c(NA, "olivedrab")) # <-- Update the values HERE
+# Combine the occurrence and background data
+data <- rbind(pika_data, background) %>%
+  mutate(response = as.factor(response)) # convert response variable to factor (not numeric) for categorical machine learning
+data <- na.omit(data)
 
-# And add those observations
-points(x = obs_data$longitude, 
-       y = obs_data$latitude, 
-       col = "black",
-       pch = "+", 
-       cex = 0.75)
+# Run random forests model
+set.seed(1)
+model_rf <- randomForest(response ~ .,         # SDM formula (response as a function of all predictors)
+                         data       = data,    # Data dataframe
+                         ntree      = 1000,    # Number of trees to build
+                         importance = TRUE,    # Calculate variable importance
+                         classwt    = c(1, 5)) # Class weights (for unbalanced data)
 
-library(sf)
-# Canadian borders
-canada_provinces <- st_read("data/SDM/lpr_000b16a_e.shp")
-canada_provinces <- st_transform(canada_provinces, crs = st_crs(my_map))
+# Check model output and confusion matrix
+model_rf
 
-# Redraw those country borders
-plot(my_map, add = TRUE, border = "grey5",
-     )
+# Variable importance plot
+varImpPlot(model_rf, 
+           main = "Variable Importance",
+           type = 1) # Type 1 for mean decrease in accuracy
 
-plot(st_geometry(canada_provinces), 
-     add = TRUE, 
-     border = "grey5")
 
-str(canada_provinces)
+# Predict the distribution of the collared pika
+predict_pika <- c(predict(predictors, model_rf, type = "response"),
+                  predict(predictors, model_rf, type = "prob"))
 
-ggplot(data = canada_provinces) +
-  geom_sf(color = "blue", fill = NA, size = 1.5)
+
+# Rename raster layers for clarity
+names(predict_pika) <- c("prediction", "prob_neg", "prob_pos")
+predict_pika
+
+par(mfrow = c(1, 2))
+plot(predict_pika$prob_pos, main = "Probability of Presence")
+plot(predict_pika$prediction, main = "Prediction")
+par(mfrow = c(1, 1))
+
+prediction_raster <- predict_pika[["prediction"]]
+
+# Convert to integer explicitly
+prediction_raster <- round(prediction_raster)
+prediction_raster <- as.numeric(prediction_raster)  # ensure it's numeric
+prediction_raster <- terra::classify(prediction_raster, rbind(c(-Inf, 0.5, 0), c(0.5, Inf, 1)))
+
+# Set levels (categories)
+levels <- data.frame(value = c(0, 1), 
+                     category = c("Absence", "Presence"))
+levels(prediction_raster) <- levels
+
+# Save SDM
+writeRaster(predict_pika$prediction,
+            filename = "C:/PythonGitHub/Mittelstaedt_Undergrad_Thesis/data/SDM/sdm_final.tif",
+            overwrite = TRUE,
+            datatype = "INT1U")

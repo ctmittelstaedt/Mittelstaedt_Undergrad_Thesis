@@ -1,8 +1,12 @@
-# Temperature vs activity
+##################################################################################
+# Bayesian model of weather effect on daily pika call rate
+# Charlotte Mittelstaedt - The University of British Columbia
+# Created 9 February 2025
+##################################################################################
 
-library(tidyverse) # data manipulation (includes ggplot2)
-library(tidybayes) # easy retrieval of BRM prediction
-library(brms) # Bayesian model fitting
+library(tidyverse) 
+library(tidybayes) 
+library(brms) 
 library(data.table)
 library(sjPlot)
 library(gghalves)
@@ -10,7 +14,7 @@ library(ggplot2)
 library(gridExtra)
 library(patchwork)
 
-# ****IGNORE the  data processing!!!!!! Jump to line 40
+# Data processing
 
 # Convert extra weather days into .Rdata
 weather_extras <- fread(file.path("data","pika_activity","predict_score_weather_extras.csv"))
@@ -19,9 +23,10 @@ saveRDS(weather_extras,file.path("recognizer_outputs","predict_score_weather_ext
 weather_extra_day <- "Recognizers/Predict/weather_extras"
 weather_output_folder <- "recognizer_outputs/predictions"
 
-# Get the list of all CSV files in the folder
+# Get the list of all csv files in the folder
 weather_csv <- list.files(weather_extra_day, pattern = "\\.csv$", full.names = TRUE)
 
+# Batch process files
 lapply(weather_csv, function(csv_file) {
   tryCatch({
     # Read the CSV file
@@ -39,7 +44,6 @@ lapply(weather_csv, function(csv_file) {
     cat("Error message:", e$message, "\n")
   })
 })
-
 
 # Merge all predictions into one mega-file
 rds_folder <- "recognizer_outputs/predictions"
@@ -59,11 +63,6 @@ filtered_pikaru <- merged_data[!grepl("PIKARU16|PIKARU17|PIKARU18|PIKARU19|PIKAR
 
 # Save filtered table
 saveRDS(filtered_pikaru, file = "recognizer_outputs/predictions/all_sites_weather_predictions.RData")
-
-
-
-
-###### START HERE: ######################################
 
 # Call in .Rdata
 filtered_pikaru <- readRDS("recognizer_outputs/predictions/all_sites_weather_predictions.RData")
@@ -105,9 +104,9 @@ weather_vs_calls <- merge(site_date_count, weather_data, by = c("site","date"), 
 weather_vs_calls$site <- factor(weather_vs_calls$site)
 
 
-################################BAYESIAN MODEL############################################
+# Bayesian model
 
-# Scale data to help with intercept prior estimate
+# Centre data to help with intercept prior estimate
 weather_vs_calls_scaled <- weather_vs_calls %>%
   mutate(
     max_temp = scale(max_temp, center = TRUE, scale = FALSE)[,1],         
@@ -115,7 +114,7 @@ weather_vs_calls_scaled <- weather_vs_calls %>%
     avg_wind_speed = scale(avg_wind_speed, center = TRUE, scale = FALSE)[,1]   
   )
 
-# Set priors - need to scale these down if using Poisson*make SD smaller from 5
+# Set priors
 prior1 <- c(set_prior(prior = 'normal(0.12,1)', class='b', coef='max_temp'), 	
             set_prior(prior = 'normal(-0.15,0.5)',class='b', coef='daily_rainfall'),
             set_prior(prior = 'normal(-0.15,0.5)', class='b', coef='avg_wind_speed'),
@@ -125,7 +124,7 @@ prior1 <- c(set_prior(prior = 'normal(0.12,1)', class='b', coef='max_temp'),
 # Test collinearity
 cor(weather_vs_calls[,c("max_temp","daily_rainfall","avg_wind_speed")])
 
-## Model with site as a random effect
+# Model 
 weather_model_1 <- brm(
   count ~ max_temp + 
           daily_rainfall + 
@@ -143,22 +142,25 @@ weather_model_1 <- brm(
   control = list(adapt_delta = 0.999, max_treedepth = 20)
   )
 
+# Save model
 saveRDS(weather_model_1, "weather_model_1.rds")
 
+# Read in model
 weather_model_1 <- readRDS("weather_model_1.rds")
 
-## look at the distribution of the parameters, look at effective sample size ESS
+# Look at the distribution of the parameters, look at effective sample size ESS
 summary(weather_model_1)
-## summary of the fixed effects
+# Summary of the fixed effects
 fixef(weather_model_1)
+# Random effects
 ranef(weather_model_1)
-## trace the plots to check convergence
+# Trace plots to check convergence
 plot(weather_model_1)
-## plot a "goodness of fit" plot, compare your model distribution to the poster distriubtion of the data
+# Goodness of fit plot
 pp_check(weather_model_1)
 as_draws_df()
 
-#Set colours
+#Set site colours
 site_weather_colours <- c(
   "PC"="#e59e62",
   "PP"="#b8901e",
@@ -173,29 +175,31 @@ weather_vs_calls_pred <- weather_vs_calls_scaled
 weather_vs_calls_pred$daily_rainfall = mean(weather_vs_calls_pred$daily_rainfall)
 weather_vs_calls_pred$avg_wind_speed = mean(weather_vs_calls_pred$avg_wind_speed)
 
-# Calculate meaninful effect sizes (slopes)
+# Calculate meaningful effect sizes (slopes)
 # Temp
 exp(5.84 + 0.06 + (-0.002631234)*(mean(weather_vs_calls_pred$daily_rainfall))+(0.09)*(mean(weather_vs_calls_pred$avg_wind_speed))) - exp(5.84 + (-0.002631234)*(mean(weather_vs_calls_pred$daily_rainfall))+(0.09)*(mean(weather_vs_calls_pred$avg_wind_speed)))
 # Wind
 exp(5.84 + 0.09 + (-0.002631234)*(mean(weather_vs_calls_pred$daily_rainfall))+(0.06)*(mean(weather_vs_calls_pred$max_temp))) - exp(5.84 + (-0.002631234)*(mean(weather_vs_calls_pred$daily_rainfall)) + (0.06)*(mean(weather_vs_calls_pred$max_temp)))
 
-## Create a data frame of predictions from our model
+## Create a data frame of predictions from model
 predictions <- add_epred_draws(weather_vs_calls_pred,
                                    weather_model_1,re_formula = ~ (1|site)) 
 
+# Uncentre data
 mean_max_temp <- mean(weather_vs_calls$max_temp)
 predictions$uncentered_max_temp <- predictions$max_temp + mean_max_temp
 weather_vs_calls_scaled$uncentered_max_temp <- weather_vs_calls_scaled$max_temp + mean_max_temp
 
+# Temperature site-level plot
 plot1 <- ggplot(predictions,aes(uncentered_max_temp,count))+
   stat_lineribbon(data = predictions,aes(y = .epred,fill = site),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
   stat_lineribbon(data = predictions,aes(y = .epred,color = site),.width = c(0), alpha = 1)+ ## mean
   geom_point(aes(x = uncentered_max_temp, y = count,color=site), data = weather_vs_calls_scaled)+
-  scale_color_manual(values = site_colors) +  # Custom colors for points and lines
+  scale_color_manual(values = site_colors) + 
   scale_fill_manual(values = site_colors) + 
   scale_x_continuous(
       # Define the range of the x-axis
-    #breaks = seq(6, 21, by = 3),  # Adjust the breaks as needed
+    #breaks = seq(6, 21, by = 3)
     labels = scales::label_number() 
   )+
   theme_bw()+
@@ -225,17 +229,17 @@ plot1 <- ggplot(predictions,aes(uncentered_max_temp,count))+
     color = "none"  # Remove the color legend as well
   )
   
-
 plot1
 
-
+# Plot 2 predictions
 predictions2 <- add_epred_draws(weather_vs_calls_pred,
                                weather_model_1,re_formula = NA)
 
+# Uncentre data
 predictions2$uncentered_max_temp <- predictions2$max_temp + mean_max_temp
 weather_vs_calls_scaled$uncentered_max_temp <- weather_vs_calls_scaled$max_temp + mean_max_temp
 
-
+# Temperature plot fixed effect
 plot2 <- ggplot(predictions2,aes(uncentered_max_temp,count))+
   stat_lineribbon(data = predictions2,aes(y = .epred),.width = c(0.95), alpha = 0.25, colour = "#0e1b5e")+ ## 95% credible interval
   stat_lineribbon(data = predictions2,aes(y = .epred),.width = c(0), alpha = 1, colour = "#0e1b5e")+ ## mean
@@ -267,18 +271,23 @@ plot2 <- ggplot(predictions2,aes(uncentered_max_temp,count))+
 
 plot2
 
-# Plot 2 - rainfall
+# Rainfall
+
+# Disentangle variables
 weather_vs_calls_pred_rain = weather_vs_calls_scaled
 weather_vs_calls_pred_rain$max_temp = mean(weather_vs_calls_pred_rain$max_temp)
 weather_vs_calls_pred_rain$avg_wind_speed = mean(weather_vs_calls_pred_rain$avg_wind_speed)
 
+# Predictions
 predictions3 <- add_epred_draws(weather_vs_calls_pred_rain,
                                weather_model_1,re_formula = ~(1|site)) 
 
+# Uncentre data
 mean_rain <- mean(weather_vs_calls$daily_rainfall)
 predictions3$uncentered_rain <- predictions3$daily_rainfall + mean_rain
 weather_vs_calls_scaled$uncentered_rain <- weather_vs_calls_scaled$daily_rainfall + mean_rain
 
+# Rainfall site-level plot
 plot3 <- ggplot(predictions3,aes(uncentered_rain,count))+
   stat_lineribbon(data = predictions3,aes(y = .epred,fill = site),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
   stat_lineribbon(data = predictions3,aes(y = .epred,color = site),.width = c(0), alpha = 1)+ ## mean
@@ -316,14 +325,15 @@ plot3 <- ggplot(predictions3,aes(uncentered_rain,count))+
 
 plot3
 
-#Fixed effect
+# Fixed effect predictions
 predictions4 <- add_epred_draws(weather_vs_calls_pred_rain,
                                 weather_model_1,re_formula = NA)
 
+# Uncentre data
 predictions4$uncentered_rain <- predictions4$daily_rainfall + mean_rain
 weather_vs_calls_scaled$uncentered_rain <- weather_vs_calls_scaled$daily_rainfall + mean_rain
 
-
+# Plot rainfall vs fixed effect
 plot4 <- ggplot(predictions4,aes(uncentered_rain,count))+
   stat_lineribbon(data = predictions4,aes(y = .epred),.width = c(0.95), alpha = 0.25, colour = "#0e1b5e")+ ## 95% credible interval
   stat_lineribbon(data = predictions4,aes(y = .epred),.width = c(0), alpha = 1, colour = "#0e1b5e")+ ## mean
@@ -355,18 +365,23 @@ plot4 <- ggplot(predictions4,aes(uncentered_rain,count))+
 
 plot4
 
-# Plot 3 - wind speed
+# Wind speed
+
+# Disentangle variables
 weather_vs_calls_pred_wind = weather_vs_calls_scaled
 weather_vs_calls_pred_wind$max_temp = mean(weather_vs_calls_pred_wind$max_temp)
 weather_vs_calls_pred_wind$daily_rainfall = mean(weather_vs_calls_pred_wind$daily_rainfall)
 
+# Predictions for sites
 predictions5 <- add_epred_draws(weather_vs_calls_pred_wind,
                                weather_model_1,re_formula = ~(1|site)) 
 
+# Uncentre data
 mean_wind <- mean(weather_vs_calls$avg_wind_speed)
 predictions5$uncentered_wind <- predictions5$avg_wind_speed + mean_wind
 weather_vs_calls_scaled$uncentered_wind <- weather_vs_calls_scaled$avg_wind_speed + mean_wind
 
+# Plot wind speed vs sites
 plot5 <- ggplot(predictions5,aes(uncentered_wind,count))+
   stat_lineribbon(data = predictions5,aes(y = .epred,fill = site),.width = c(0.95), alpha = 0.25)+ ## 95% credible interval
   stat_lineribbon(data = predictions5,aes(y = .epred,color = site),.width = c(0), alpha = 1)+ ## mean
@@ -390,26 +405,28 @@ plot5 <- ggplot(predictions5,aes(uncentered_wind,count))+
     axis.text.y = element_text(size = 15),
     axis.title.x = element_text(size = 20, vjust = -2, margin=margin(b=10)),
     axis.title.y = element_text(size = 20, vjust = 4, margin=margin(l=10)),
-    panel.border = element_blank(),            # Remove panel border
+    panel.border = element_blank()#,            # Remove panel border
     legend.title = element_blank(),            # Remove legend title
     legend.key = element_blank(),
     legend.text = element_text(size=15)
-  )+
+  ) 
++
   guides(
-    fill = "none",  # Remove the fill legend
+    fill = "none", #Remove the fill legend
     color = "none"  # Remove the color legend as well
   )
 
 plot5
 
-#Fixed effect
+# Fixed effect predictions
 predictions6 <- add_epred_draws(weather_vs_calls_pred_wind,
                                 weather_model_1,re_formula = NA)
 
+# Uncentre predictions
 predictions6$uncentered_wind <- predictions6$avg_wind_speed + mean_wind
 weather_vs_calls_scaled$uncentered_wind <- weather_vs_calls_scaled$avg_wind_speed + mean_wind
 
-
+# Plot wind speed vs fixed effect
 plot6 <- ggplot(predictions6,aes(uncentered_wind,count))+
   stat_lineribbon(data = predictions6,aes(y = .epred),.width = c(0.95), alpha = 0.25, colour = "#0e1b5e")+ ## 95% credible interval
   stat_lineribbon(data = predictions6,aes(y = .epred),.width = c(0), alpha = 1, colour = "#0e1b5e")+ ## mean
@@ -441,6 +458,7 @@ plot6 <- ggplot(predictions6,aes(uncentered_wind,count))+
 
 plot6
 
+# Plot grids
 big_weather_plot <- (plot2) / (plot4) / (plot6)
 
 big_weather_plot <- (plot1) / (plot3) / (plot5)
@@ -449,4 +467,5 @@ big_weather_plot +
   plot_layout(guides = "collect") +  # Collect all legends into one
   theme(legend.position = "none")
 
+# Save plots
 ggsave("figures/final_weather_plot2.png", plot = big_weather_plot, width = 7.5, height = 18, dpi = 300)

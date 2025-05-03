@@ -1,6 +1,9 @@
-# Graphing pika activity over the day and in relation to solar power
+##################################################################################
+# Plotting 24-h pika calling activity
+# Charlotte Mittelstaedt - The University of British Columbia
+# Created 9 February 2025
+##################################################################################
 
-#testing changes
 library(ggplot2)
 library(tidyverse)
 library(data.table)
@@ -8,27 +11,13 @@ library(purrr)
 library(gridExtra)
 library(grid)
 
-
-##################################################################################
-# Use the following code
-
-predictions <- read.csv("C:/PythonGitHub/Mittelstaedt_Undergrad_Thesis/Recognizers/Predict/predict_score_BC_7Aug2024_ARU16-19.csv")
-
-
-saveRDS(predictions,file.path("recognizer_outputs/predictions_diurnal_activity/predict_score_BC_07Aug2024.Rdata"))
-
-bc1 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_BC_07Aug2024.RData")
-bc2 <- readRDS("recognizer_outputs/predictions/predict_score_BC_PIKARU20_07Aug2024.RData")
-merged_bc <- rbind(bc1, bc2)
-saveRDS(merged_bc, file.path("recognizer_outputs/predictions_diurnal_activity/predict_score_BC_07Aug2024.Rata"))
-
-###################################
+# Read in recognizer predictions
 rdata_folder <- "recognizer_outputs/predictions_diurnal_activity"
 rdata_files <- list.files(rdata_folder, pattern = "*.RData", full.names = TRUE)
 
 print(rdata_files)
 
-# Device color mappings
+# Device color mapping
 device_colors <- c("PIKARU1" = "#88CCEE", "PIKARU2" = "#CC6677", "PIKARU3" = "#44AA99", 
                    "PIKARU4" = "#882255", "PIKARU5" = "#999933", "PIKARU6" = "#88CCEE", 
                    "PIKARU7" = "#CC6677", "PIKARU8" = "#44AA99", "PIKARU9" = "#882255", 
@@ -39,6 +28,7 @@ device_colors <- c("PIKARU1" = "#88CCEE", "PIKARU2" = "#CC6677", "PIKARU3" = "#4
                    "PIKARU21" = "#88CCEE", "PIKARU22" = "#CC6677", "PIKARU23" = "#44AA99", 
                    "PIKARU24" = "#882255", "PIKARU25" = "#999933", "PIKARU20" = "#999933")
 
+# Set plot limits for sites
 site_y_limits <- list(
   "PC" = c(0, 100),
   "PP" = c(0, 330),
@@ -47,9 +37,10 @@ site_y_limits <- list(
   "BC" = c(0, 100)
 )
 
+# Read in dark/light hour times
 sun_times <- read.csv("C:/PythonGitHub/Mittelstaedt_Undergrad_Thesis/data/pika_activity/sunrise_sunset_summer2024.csv")
 
-# Function to process and plot each RDS file (now using readRDS)
+# Function to process and plot each RDS file 
 process_and_plot <- function(rdata_file, site_y_limits, sun_times) {
   # Load the RDS file
   predictions_dt <- readRDS(rdata_file)  # This loads the RDS object from the file
@@ -102,7 +93,7 @@ process_and_plot <- function(rdata_file, site_y_limits, sun_times) {
   
   unique_dates <- unique(filtered_predictions$date)
   
-  ## Get sunrise/sunset times
+  # Get sunrise/sunset times
   sunrise_time <- sapply(unique_dates, function(date) {
     sun_times[sun_times$site == site & sun_times$date == date, "sunrise"]
   })
@@ -128,12 +119,12 @@ process_and_plot <- function(rdata_file, site_y_limits, sun_times) {
     theme_minimal() +
     theme(panel.grid = element_blank(),
           axis.line = element_line(color = "black", linewidth = 0.8),
-          axis.text = element_text(size = 15),  # Increase axis text size
+          axis.text = element_text(size = 15),  
           legend.position = "none",
           axis.title.x = element_blank(),  # Remove x-axis title for individual plots
           axis.title.y = element_blank()) +
     scale_color_manual(values = device_colors) +  # Apply the custom color mapping
-    guides(color = guide_legend(title = NULL)) +  # Remove legend title
+    guides(color = guide_legend(title = NULL)) +  
     ylim(y_limits) +
     scale_x_continuous(
       breaks = seq(0, 24, by = 6),  # Set the breaks at each hour
@@ -142,7 +133,6 @@ process_and_plot <- function(rdata_file, site_y_limits, sun_times) {
       expand = c(0, 0)
       )
   
- ####################
   if (sunset_time > 23) {
     # Shading the part between sunset and 24:00, and between 0:00 and sunrise
     plot <- plot + 
@@ -165,46 +155,36 @@ process_and_plot <- function(rdata_file, site_y_limits, sun_times) {
 }
 
 
-# Use purrr::map() to process each RDS and generate a list of plots
+# Process each RDS and generate a list of plots
 plots <- map(rdata_files, ~process_and_plot(.x, site_y_limits, sun_times))
 
-plots_to_plot <- plots[8:10]
-
-plots_to_plot_with_margin <- lapply(plots_to_plot, function(p) {
-  p + theme(plot.margin = margin(t = 10, r = 22, b = 5, l = 7))  # t: top, r: right, b: bottom, l: left
-})
-
-
+# Add padding to plots
 adjusted_plots <- lapply(plots, function(p) {
   p + theme(
-    plot.margin = unit(c(1, 0.8, 1.4, 0.5), "cm")  # Add 1 cm padding to all sides (top, right, bottom, left)
+    plot.margin = unit(c(1, 0.8, 1.4, 0.5), "cm")  
   )
 })
 
+# Specify plots
 modified_plots <- c(adjusted_plots[8],adjusted_plots[9],adjusted_plots[10],adjusted_plots[11],adjusted_plots[12],adjusted_plots[13],adjusted_plots[5],adjusted_plots[6],adjusted_plots[7],adjusted_plots[2],adjusted_plots[3],adjusted_plots[4],adjusted_plots[1])
 
+# Plot plots
 plot_grid <- grid.arrange(
-  grobs = modified_plots,       # List of plots
-  ncol = 3,            # Arrange in 3 columns
-  #left = textGrob("Number of calls\nper hour", rot = 90, gp = gpar(fontsize = 18)),  # y-axis label
+  grobs = modified_plots,       
+  ncol = 3,           
+  #left = textGrob("Number of calls\nper hour", rot = 90, gp = gpar(fontsize = 18)), 
   #bottom = textGrob("Hour of day", gp = gpar(fontsize = 18)),
-  padding = unit(1, "cm")  # Equal heights for rows (adjust as needed)
+  padding = unit(1, "cm") 
 )
 
-
-# Optionally, view the first plot
-print(plots[[1]])
-
+# Save plots
 ggsave("figures/activity_plots_all.png", plot=plot_grid, width = 12, height =15)
 
 
+#########################################################################################
+# Calculate calling mean number of daylight vs nighttime calls
+#########################################################################################
 
-
-
-
-
-
-# Number of daylight vs nighttime calls
 # Pika Camp
 pc1 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_PC_18Jul2024.RData")
 pc2 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_PC_20240721.RData")
@@ -221,12 +201,12 @@ pc1[, `:=`(
 
 pc1[, time := as.numeric(time)] 
 
-# Night
+## Night
 count <- pc1[ (time >= 5000 & time <= 35000), .N]
 count
 count/3 #per hour
 
-# Daylight
+## Daylight
 count <- pc1[ (time >= 35000 & time <= 235959) | (time >= 0 & time <= 5000), .N]
 count
 count/21 #per hour
@@ -242,12 +222,12 @@ pc2[, `:=`(
 
 pc2[, time := as.numeric(time)] 
 
-# Night
+## Night
 count <- pc2[ (time >= 4000 & time <= 40000), .N]
 count
 count/3.33 #per hour
 
-# Daylight
+## Daylight
 count <- pc2[ (time >= 40000 & time <= 235959) | (time >= 0 & time <= 4000), .N]
 count
 count/20.66 #per hour
@@ -264,12 +244,12 @@ pc3[, `:=`(
 
 pc3[, time := as.numeric(time)] 
 
-# Night
+## Night
 count <- pc3[ (time >= 2000 & time <= 42000), .N]
 count
 count/4 #per hour
 
-# Daylight
+## Daylight
 count <- pc3[ (time >= 42000 & time <= 235959) | (time >= 0 & time <= 2000), .N]
 count
 count/20 #per hour
@@ -299,12 +279,12 @@ pc1[, `:=`(
 
 pc1[, time := as.numeric(time)]
 
-# Night
+## Night
 count <- pc1[ (time >= 5000 & time <= 35000), .N]
 count
 count/3 #per hour
 
-# Daylight
+## Daylight
 count <- pc1[ (time >= 35000 & time <= 235959) | (time >= 0 & time <= 5000), .N]
 count
 count/21 #per hour
@@ -321,12 +301,12 @@ pc2[, `:=`(
 
 pc2[, time := as.numeric(time)] 
 
-# Night
+## Night
 count <- pc2[ (time >= 4000 & time <= 40000), .N]
 count
 count/3.33 #per hour
 
-# Daylight
+## Daylight
 count <- pc2[ (time >= 40000 & time <= 235959) | (time >= 0 & time <= 4000), .N]
 count
 count/20.66 #per hour
@@ -343,12 +323,12 @@ pc3[, `:=`(
 
 pc3[, time := as.numeric(time)] 
 
-# Night
+## Night
 count <- pc3[ (time >= 3000 & time <= 41000), .N]
 count
 count/3.66 #per hour
 
-# Daylight
+## Daylight
 count <- pc3[ (time >= 41000 & time <= 235959) | (time >= 0 & time <= 3000), .N]
 count
 count/20.33 #per hour
@@ -356,7 +336,7 @@ count/20.33 #per hour
 (337+451.54+593.26)/3
 (37+79.27+125.68)/3
 
-#Mt. Decoeli
+# Mt. Decoeli
 pc1 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_MD_28Jul2024.RData")
 pc2 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_MD_31Jul2024.RData")
 pc3 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_MD_20240727.RData")
@@ -376,12 +356,12 @@ pc1[, `:=`(
 
 pc1[, time := as.numeric(time)] 
 
-# Night
+## Night
 count <- pc1[ (time >= 1000 & time <= 43000), .N]
 count
 count/4.33 #per hour
 
-# Daylight
+## Daylight
 count <- pc1[ (time >= 43000 & time <= 235959) | (time >= 0 & time <= 1000), .N]
 count
 count/19.66 #per hour
@@ -397,12 +377,12 @@ pc2[, `:=`(
 
 pc2[, time := as.numeric(time)]
 
-# Night
+## Night
 count <- pc2[ (time >= 235000 & time <= 235959)|(time >= 0 & time <= 44000), .N]
 count
 count/4.83 #per hour
 
-# Daylight
+## Daylight
 count <- pc2[ (time > 44000 & time <= 235000), .N]
 count
 count/19.17 #per hour
@@ -418,12 +398,12 @@ pc3[, `:=`(
 
 pc3[, time := as.numeric(time)] 
 
-# Night
+## Night
 count <- pc3[ (time >= 1000 & time <= 43000), .N]
 count
 count/4.33 #per hour
 
-# Daylight
+## Daylight
 count <- pc3[ (time >= 43000 & time <= 235959) | (time >= 0 & time <= 1000), .N]
 count
 count/19.66 #per hour
@@ -431,7 +411,7 @@ count/19.66 #per hour
 (27.56+15.80+34.79)/3
 (3+44.92+90.06)/3
 
-#Mt. Boyle
+# Mt. Boyle
 pc1 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_MB_09Aug2024.RData")
 pc2 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_MB_10Aug2024.RData")
 pc3 <- readRDS("recognizer_outputs/predictions_diurnal_activity/predict_score_MB_12Aug2024.RData")
@@ -451,12 +431,12 @@ pc1[, `:=`(
 
 pc1[, time := as.numeric(time)] 
 
-# Night
+## Night
 count <- pc1[ (time >= 1000 & time <= 43000), .N]
 count
 count/4.33 #per hour
 
-# Daylight
+## Daylight
 count <- pc1[ (time >= 43000 & time <= 235959) | (time >= 0 & time <= 1000), .N]
 count
 count/19.66 #per hour
@@ -472,17 +452,17 @@ pc2[, `:=`(
 
 pc2[, time := as.numeric(time)]
 
-# Night
+## Night
 count <- pc2[ (time > 0 & time < 44000), .N]
 count
 count/4.66 #per hour
 
-# Daylight
+## Daylight
 count <- pc2[ (time > 44000 & time <= 235999), .N]
 count
 count/19.33 #per hour
 
-# Day 3
+## Day 3
 pc3 <- pc3[!grepl("\\.\\d5$", end_time)]
 pc3 <- pc3[PIKA > 10]
 
@@ -493,12 +473,12 @@ pc3[, `:=`(
 
 pc3[, time := as.numeric(time)] 
 
-# Night
+## Night
 count <- pc3[ (time >= 235000 & time <= 235959) | (time >= 0 & time < 44000), .N]
 count
 count/4.83 #per hour
 
-# Daylight
+## Daylight
 count <- pc3[ (time >= 44000 & time < 235000), .N]
 count
 count/19.17 #per hour
