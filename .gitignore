@@ -181,7 +181,7 @@ Rplots.pdf
 *.tif
 *.shp
 *.venv\
-*.wav
+Recognizers\*\*.wav
 *.txt
 *.mp3
 *.m4a
