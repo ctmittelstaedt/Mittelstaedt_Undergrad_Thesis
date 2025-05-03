@@ -209,6 +209,7 @@ Thumbs.db
 index.lock
 .httr-oauth
 
+
 # Ignore for both R and Python
 ## Ignore audio data files
 .wav
@@ -240,6 +241,5 @@ Recognizers/evaluating_test_set_histograms/test_Jan1.png
 *.prj
 *.shx
 *.dbf
-*.png
 *.qgz
 
