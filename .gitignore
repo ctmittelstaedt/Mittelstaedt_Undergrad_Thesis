@@ -181,8 +181,6 @@ Rplots.pdf
 *.tif
 *.shp
 *.venv\
-*.wav
-!data\individuality\*.wav
 *.txt
 *.mp3
 *.m4a
