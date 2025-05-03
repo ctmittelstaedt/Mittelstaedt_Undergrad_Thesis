@@ -1,1 +1,0 @@
-# Pika activity vs birds
