@@ -183,8 +183,6 @@ Rplots.pdf
 *.venv\
 *.txt
 *.mp3
-*.wav
-!data/individuality/*.wav
 *.m4a
 *.heic
 ## temporary files
