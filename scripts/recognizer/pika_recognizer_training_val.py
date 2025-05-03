@@ -1,3 +1,9 @@
+########################################################################################
+# Training and validating pika recognizer
+# Charlotte Mittelstaedt - University of British Columbia
+# Created 7 November 2024
+########################################################################################
+
 # The cnn module provides classes for training/predicting with various types of CNNs
 from opensoundscape import CNN
 
@@ -25,10 +31,6 @@ from opensoundscape.ml.dataloaders import SafeAudioDataloader
 # Set up plotting
 from matplotlib import pyplot as plt
 from matplotlib import rcParams
-#plt.rcParams['figure.figsize']=[15,5] #for large visuals
-
-#rcParams['figure.figsize'] = (10, 6)  # Example of setting figure size
-#rcParams['figure.dpi'] = 100           # Example of setting dpi
 
 # Initiate wandb performance logging
 import wandb
@@ -43,7 +45,7 @@ except: #if wandb.init fails, don't use wandb logging
     print('failed to create wandb session. wandb session will be None')
     wandb_session = None
 
-# Set seeds for reproducibility. Remove when running final model
+# Set seeds for reproducibility. Remove when running final model.
 #torch.manual_seed(0)
 #random.seed(0)
 #np.random.seed(0)
@@ -67,7 +69,7 @@ annotations = BoxedAnnotations.from_raven_files(
 
 # Access the underlying DataFrame
 annotations_data = annotations.df
-annotations_data.to_csv("./All_annotations_copy/annotations_data.csv")
+annotations_data.to_csv("./annotations_data.csv")
 
 # Parameters to use for label creation
 clip_duration = 0.3 # clip length (s)
@@ -86,7 +88,7 @@ clip_labels = annotations.clip_labels(
 )
 
 # Access the underlying DataFrame
-clip_labels.to_csv("./All_annotations_copy/clip_labels.csv")
+clip_labels.to_csv("./clip_labels.csv")
 
 # Select all files from testing_data_raven as a test set
 mask = clip_labels.reset_index()['file'].apply(lambda x: 'testing_data_audio' in x).values
@@ -96,11 +98,11 @@ test_set = clip_labels[mask]
 train_and_val_set = clip_labels.drop(test_set.index)
 
 # Save .csv tables of the training/validation and test sets to keep a record of them
-train_and_val_set.to_csv("./All_annotations_copy/train_and_val_set.csv")
-test_set.to_csv("./All_annotations_copy/test_set.csv")
+train_and_val_set.to_csv("./train_and_val_set.csv")
+test_set.to_csv("./test_set.csv")
 
-train_and_val_set = pd.read_csv('./All_annotations_copy/train_and_val_set.csv',index_col=[0,1,2])
-test_set = pd.read_csv('./All_annotations_copy/test_set.csv',index_col=[0,1,2])
+train_and_val_set = pd.read_csv('./train_and_val_set.csv',index_col=[0,1,2])
+test_set = pd.read_csv('./test_set.csv',index_col=[0,1,2])
 
 
 # Balance the negatives and positives so there are 2x the number of negatives as positives
@@ -129,8 +131,8 @@ balanced_train_and_val_set = shuffle(balanced_train_and_val_set) # random_state 
 
 # Split training data into training and validation sets
 train_df, valid_df = sklearn.model_selection.train_test_split(balanced_train_and_val_set, test_size=0.2) # test_size = 0.2 to split data into 20% validation, random_state ensures reproducibility
-train_df.to_csv("./All_annotations_copy/train_set.csv")
-valid_df.to_csv("./All_annotations_copy/valid_set.csv")
+train_df.to_csv("./train_set.csv")
+valid_df.to_csv("./valid_set.csv")
 
 # Modify the default preprocessor for training data **could add dB modifications
 preprocessor = SpectrogramPreprocessor(sample_duration=0.3) # sample_duration must match clip_duration
@@ -141,18 +143,18 @@ preprocessor.pipeline.to_spec.params['overlap_fraction'] = 0.9 # fractional temp
 preprocessor.pipeline.to_spec.params
 #print(preprocessor.pipeline.to_spec.params) # double check preprocessor parameters
 
-#preprocessor = SpectrogramPreprocessor(sample_duration=0.3) # sample_duration must match clip_duration
-#valid_dataset = AudioFileDataset(valid_df, preprocessor)
-#preprocessor.pipeline
-#preprocessor.pipeline.bandpass.set(min_f=700,max_f=6500) # eliminate unnecessary frequencies
-#preprocessor.pipeline.to_spec.params['overlap_fraction'] = 0.9 # fractional temporal overlap between consecutive windows
-#preprocessor.pipeline.to_spec.params
-#print(preprocessor.pipeline.to_spec.params) # double check preprocessor parameters
+preprocessor = SpectrogramPreprocessor(sample_duration=0.3) # sample_duration must match clip_duration
+valid_dataset = AudioFileDataset(valid_df, preprocessor)
+preprocessor.pipeline
+preprocessor.pipeline.bandpass.set(min_f=700,max_f=6500) # eliminate unnecessary frequencies
+preprocessor.pipeline.to_spec.params['overlap_fraction'] = 0.9 # fractional temporal overlap between consecutive windows
+preprocessor.pipeline.to_spec.params
+print(preprocessor.pipeline.to_spec.params) # double check preprocessor parameters
 
 # Visualize preprocessed tensors
-#tensors = [train_dataset[i].data for i in range(16,25)]
-#_ = show_tensor_grid(tensors,3)
-#plt.show()
+tensors = [train_dataset[i].data for i in range(16,25)]
+_ = show_tensor_grid(tensors,3)
+plt.show()
 
 # Define model architecture
 architecture = 'resnet34'
@@ -190,7 +192,7 @@ if __name__ == '__main__':
     log_interval = 100, # log progress every 100 batches
     num_workers = 6, # parallelized cpu tasks for preprocessing
     wandb_session=wandb_session, 
-    save_interval = 2, # save checkpoint every 10 epochs
+    save_interval = 2, # save checkpoint every 2 epochs
     save_path = checkpoint_folder # location to save checkpoints
 )
 
