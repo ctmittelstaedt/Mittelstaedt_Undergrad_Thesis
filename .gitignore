@@ -183,6 +183,8 @@ Rplots.pdf
 *.venv\
 *.txt
 *.mp3
+*.wav
+!data/individuality/*.wav
 *.m4a
 *.heic
 ## temporary files
@@ -211,7 +213,6 @@ index.lock
 
 # Ignore for both R and Python
 ## Ignore audio data files
-.wav
 .mp3
 .m4a
 .heic
